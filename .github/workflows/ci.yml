@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  javascript:
+    name: Node.js ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+    defaults:
+      run:
+        working-directory: javascript
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+          cache-dependency-path: javascript/package-lock.json
+      - run: npm ci
+      - run: npm audit --audit-level=high
+      - run: npm run typecheck
+      - run: npm test
+      - run: node --check ../examples/javascript/database.mjs && node --check ../examples/javascript/mail.cjs
+      - run: npm run pack:check
+
+  python:
+    name: Python ${{ matrix.python }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.13", "3.14"]
+    defaults:
+      run:
+        working-directory: python
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install uv==0.12.6
+      - run: uv sync --all-groups --frozen --python ${{ matrix.python }}
+      - run: uv run --frozen ruff format --check . ../examples/python
+      - run: uv run --frozen ruff check . ../examples/python
+      - run: uv run --frozen mypy src tests ../examples/python
+      - run: uv run --frozen pytest
+      - run: uv run --frozen pip-audit
+      - run: uv build
+
+  versions:
+    name: Package versions match
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node -e "const fs=require('fs'); const npm=require('./javascript/package.json').version; const js=fs.readFileSync('./javascript/src/version.ts','utf8').match(/SDK_VERSION = '([^']+)'/)[1]; const py=fs.readFileSync('./python/src/justdeploy/_version.py','utf8').match(/__version__ = \"([^\"]+)\"/)[1]; if (new Set([npm, js, py]).size !== 1) throw new Error('Package versions differ');"

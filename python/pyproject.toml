@@ -1,0 +1,63 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "justdeploy-sdk"
+dynamic = ["version"]
+description = "Official server-side Python SDK for JustDeploy"
+readme = "README.md"
+requires-python = ">=3.12,<3.15"
+license = "Apache-2.0"
+authors = [{ name = "CUPPASOFT LTD" }]
+dependencies = [
+  "cryptography>=50.0.1",
+  "httpx>=0.28,<1",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Typing :: Typed",
+]
+
+[project.urls]
+Homepage = "https://github.com/cuppasoft/justdeploy-sdk"
+Issues = "https://github.com/cuppasoft/justdeploy-sdk/issues"
+Repository = "https://github.com/cuppasoft/justdeploy-sdk.git"
+
+[dependency-groups]
+dev = [
+  "build>=1.3",
+  "mypy>=1.17",
+  "pip-audit>=2.10,<3",
+  "pytest>=8.4",
+  "pytest-asyncio>=1.1",
+  "ruff>=0.12",
+]
+
+[tool.hatch.version]
+path = "src/justdeploy/_version.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/justdeploy"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+packages = ["justdeploy"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 140
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
