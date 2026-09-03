@@ -5,7 +5,7 @@ def use_sync(client: JustDeploy, database_id: str, storage_id: str) -> None:
     result: QueryResult = client.databases.query(database_id, "SELECT * FROM orders")
     file: StoredFile = client.storages.upload(storage_id, name="hello.txt", mime="text/plain", data=b"hello")
     mail: Mail = client.mail.send(
-        from_address="hello@example.com",
+        sender="hello@example.com",
         to="user@example.net",
         subject="Hello",
         text="Hi",
@@ -17,7 +17,7 @@ async def use_async(client: AsyncJustDeploy, database_id: str, storage_id: str) 
     result: QueryResult = await client.databases.query(database_id, "SELECT * FROM orders")
     file: StoredFile = await client.storages.upload(storage_id, name="hello.txt", mime="text/plain", data=b"hello")
     mail: Mail = await client.mail.send(
-        from_address="hello@example.com",
+        sender="hello@example.com",
         to="user@example.net",
         subject="Hello",
         text="Hi",

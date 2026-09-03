@@ -4,7 +4,7 @@ const justdeploy = new JustDeploy();
 
 async function main() {
   const mail = await justdeploy.mail.send({
-    from: 'hello@your-verified-domain.example',
+    sender: 'hello@your-verified-domain.example',
     to: 'user@example.com',
     subject: 'Welcome',
     text: 'Thanks for joining.',

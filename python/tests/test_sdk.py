@@ -299,7 +299,7 @@ def test_database_and_mail_paths_bodies_and_pagination() -> None:
         databases.update_table("db/id", "orders", {"comment": "updated"})
         databases.delete_table("db/id", "orders")
         mail.send(
-            from_address="hello@example.com",
+            sender="hello@example.com",
             to="user@example.net",
             subject="Hello",
             text="Hi",
@@ -337,7 +337,7 @@ async def test_async_database_and_mail_surface_matches_sync() -> None:
         assert await AsyncDatabases(transport).query("database-id", "INSERT INTO items (name) VALUES ('a')") == {"id": 7}
         assert (
             await AsyncMailClient(transport).send(
-                from_address="hello@example.com",
+                sender="hello@example.com",
                 to="user@example.net",
                 subject="Hello",
                 text="Hi",
@@ -501,6 +501,125 @@ def test_failed_upload_removes_its_pending_file_record_and_preserves_the_transfe
         Storages(transport).upload("storage-id", name="hello.txt", mime="text/plain", data=b"hello")
     assert raised.value.status == 501
     assert [request.method for request in requests] == ["POST", "POST", "PUT", "DELETE"]
+
+
+def test_downloading_a_pending_file_explains_the_upload_race() -> None:
+    download_url = "https://files.example.test/object?signature=download"
+    file = {
+        "id": "file-id",
+        "name": "hello.txt",
+        "path": "file-id",
+        "mime": "text/plain",
+        "size": 0,
+        "status": "pending",
+        "error": None,
+        "createdAt": "2026-01-01T00:00:00.000Z",
+        "updatedAt": "2026-01-01T00:00:00.000Z",
+        "url": download_url,
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/auth/credential":
+            return session()
+        if request.url.path.endswith("/files/file-id"):
+            return response({"file": file})
+        if str(request.url) == download_url:
+            return httpx.Response(404)
+        raise AssertionError(f"Unexpected request: {request.method} {request.url}")
+
+    client, transport = sync_stack(handler)
+    with client, pytest.raises(JustDeployError, match="upload has not finished yet") as caught:
+        Storages(transport).download("storage-id", "file-id")
+    assert caught.value.status == 404
+
+
+async def test_cancelled_async_upload_removes_its_pending_file_record() -> None:
+    requests: list[httpx.Request] = []
+    upload_started = asyncio.Event()
+    upload_url = "https://uploads.example.test/object?signature=upload"
+    file = {
+        "id": "file-id",
+        "name": "hello.txt",
+        "path": "file-id",
+        "mime": "text/plain",
+        "size": 0,
+        "status": "pending",
+        "error": None,
+        "createdAt": "2026-01-01T00:00:00.000Z",
+        "updatedAt": "2026-01-01T00:00:00.000Z",
+        "url": upload_url,
+    }
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        if request.url.path == "/auth/credential":
+            return session()
+        if request.url.path.endswith("/files") and request.method == "POST":
+            return response({"files": [file]}, 201)
+        if str(request.url) == upload_url:
+            upload_started.set()
+            await asyncio.Event().wait()
+        if request.url.path.endswith("/files/file-id") and request.method == "DELETE":
+            return httpx.Response(200)
+        raise AssertionError(f"Unexpected request: {request.method} {request.url}")
+
+    client, transport = async_stack(handler)
+    async with client:
+        upload = asyncio.create_task(AsyncStorages(transport).upload("storage-id", name="hello.txt", mime="text/plain", data=b"hello"))
+        await upload_started.wait()
+        upload.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await upload
+
+    assert [request.method for request in requests] == ["POST", "POST", "PUT", "DELETE"]
+
+
+async def test_cancel_during_failed_upload_close_happens_after_pending_cleanup(monkeypatch: pytest.MonkeyPatch) -> None:
+    requests: list[httpx.Request] = []
+    close_started = asyncio.Event()
+    upload_url = "https://uploads.example.test/object?signature=upload"
+    file = {
+        "id": "file-id",
+        "name": "hello.txt",
+        "path": "file-id",
+        "mime": "text/plain",
+        "size": 0,
+        "status": "pending",
+        "error": None,
+        "createdAt": "2026-01-01T00:00:00.000Z",
+        "updatedAt": "2026-01-01T00:00:00.000Z",
+        "url": upload_url,
+    }
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        if request.url.path == "/auth/credential":
+            return session()
+        if request.url.path.endswith("/files") and request.method == "POST":
+            return response({"files": [file]}, 201)
+        if request.url.path.endswith("/files/file-id") and request.method == "DELETE":
+            return httpx.Response(200)
+        raise AssertionError(f"Unexpected request: {request.method} {request.url}")
+
+    failed_response = httpx.Response(503)
+
+    async def slow_close() -> None:
+        close_started.set()
+        await asyncio.Event().wait()
+
+    async def failed_upload(*_args: Any, **_kwargs: Any) -> httpx.Response:
+        return failed_response
+
+    monkeypatch.setattr(failed_response, "aclose", slow_close)
+    client, transport = async_stack(handler)
+    monkeypatch.setattr(transport, "presigned_upload", failed_upload)
+    async with client:
+        upload = asyncio.create_task(AsyncStorages(transport).upload("storage-id", name="hello.txt", mime="text/plain", data=b"hello"))
+        await close_started.wait()
+        assert [request.method for request in requests] == ["POST", "POST", "DELETE"]
+        upload.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await upload
 
 
 def test_structured_error_keeps_api_fields_but_not_request_body() -> None:

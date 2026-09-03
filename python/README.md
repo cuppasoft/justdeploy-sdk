@@ -3,6 +3,8 @@
 The official JustDeploy SDK for server-side CPython 3.12, 3.13, and 3.14. Import it as `justdeploy`.
 
 > This package has not been published yet.
+>
+> SDK authentication is currently enabled only for deployed projects in the Development Playground. Local SDK Credential exchange and deployed Production SDK calls remain disabled until the separate Production rollout.
 
 ## Client
 
@@ -24,7 +26,7 @@ async with AsyncJustDeploy() as justdeploy:
     result = await justdeploy.databases.query("your-database-id", "SELECT * FROM orders")
 ```
 
-For local development, set both `JUSTDEPLOY_ACCESS_KEY` and `JUSTDEPLOY_SECRET_KEY` in the process environment. A deployed JustDeploy application needs no SDK configuration. If a deployed application explicitly keeps both variables, the SDK accepts and prioritizes them; build feedback will recommend the simpler automatic deployment identity without blocking the build.
+After the Production rollout, local development sets both `JUSTDEPLOY_ACCESS_KEY` and `JUSTDEPLOY_SECRET_KEY` in the process environment, while a deployed JustDeploy application needs no SDK configuration. Today, only the no-configuration path of a project deployed in the Development Playground is enabled. If a deployed application explicitly keeps both variables, the SDK accepts and prioritizes them; build feedback will recommend the simpler automatic deployment identity without blocking the build.
 
 ## Database
 
@@ -76,12 +78,13 @@ justdeploy.storages.delete_file(storage_id, file["id"])
 
 The async download uses `async with` and `async for chunk in download.aiter_bytes()`. Upload and download bytes stream directly to the signed Storage URL without a JustDeploy authentication header.
 When upload data is an iterator or async iterator, pass its exact byte length as `size`. Byte strings and seekable binary files are measured automatically.
+If a download races with a still-finishing upload, retry after the SDK's clear pending-upload error.
 
 ## Mail
 
 ```python
 mail = justdeploy.mail.send(
-    from_address="hello@your-verified-domain.example",
+    sender="hello@your-verified-domain.example",
     to="user@example.com",
     subject="Welcome",
     text="Thanks for joining.",
@@ -94,8 +97,10 @@ current = justdeploy.mail.get(mail["id"])
 
 Use a stable, unique `idempotency_key` when a caller might retry a mail request after losing the response. A successful send response means accepted, not delivered; check `mail["status"]` later if delivery matters.
 
-## Errors
+## Errors and cancellation
 
 All SDK and API failures extend `JustDeployError`. API errors expose `status`, `retry_after`, `request_id`, and `details`. Request bodies, SQL, file content, and authentication values are not retained in SDK errors.
+
+Async calls use normal Python task cancellation. Cancel the task with `task.cancel()`; a canceled upload also tries to remove its pending file record. Sync calls and all API requests have a 30-second timeout.
 
 The SDK may refresh authentication and repeat one failed `GET` once. It never automatically repeats a mutation.

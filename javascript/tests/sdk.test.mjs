@@ -241,7 +241,7 @@ test('database and mail methods use the exact API paths, bodies, and pagination'
   await databases.createTable('db/id', { name: 'orders', columns: [] });
   await databases.updateTable('db/id', 'orders', { comment: 'updated' });
   await databases.deleteTable('db/id', 'orders');
-  await mail.send({ from: 'hello@example.com', to: 'user@example.net', subject: 'Hello', text: 'Hi', idempotencyKey: 'welcome-1' });
+  await mail.send({ sender: 'hello@example.com', to: 'user@example.net', subject: 'Hello', text: 'Hi', idempotencyKey: 'welcome-1' });
   await mail.list({ limit: 20, cursor: 42 });
   await mail.get('mail-id');
 
@@ -293,6 +293,55 @@ test('presigned upload and download never receive JustDeploy authentication head
   const uploadCall = calls.find((call) => call.url === uploadUrl);
   assert.deepEqual([...new Headers(uploadCall.init.headers).keys()], ['content-length', 'content-type']);
   assert.equal(header(uploadCall.init, 'content-length'), '5');
+});
+
+test('canceling a download releases the source stream', async () => {
+  const downloadUrl = 'https://files.example.test/object?signature=download';
+  let canceled = false;
+  const source = new ReadableStream({ cancel() { canceled = true; } });
+  const fetcher = async (input) => {
+    const url = String(input);
+    if (url.includes('/auth/')) return session();
+    if (url.endsWith('/files/file-id')) {
+      return json({
+        file: {
+          id: 'file-id', name: 'file', path: 'file-id', mime: 'application/octet-stream', size: 0,
+          status: 'active', error: null, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z', url: downloadUrl,
+        },
+      });
+    }
+    if (url === downloadUrl) return new Response(source);
+    throw new Error(`Unexpected URL ${url}`);
+  };
+
+  const downloaded = await new Storages(credentialStack(fetcher)).download('storage-id', 'file-id');
+  assert.equal(source.locked, true);
+  await downloaded.stream.cancel();
+  assert.equal(source.locked, false);
+  assert.equal(canceled, true);
+});
+
+test('downloading a pending file explains the upload race', async () => {
+  const downloadUrl = 'https://files.example.test/object?signature=download';
+  const fetcher = async (input) => {
+    const url = String(input);
+    if (url.includes('/auth/')) return session();
+    if (url.endsWith('/files/file-id')) {
+      return json({
+        file: {
+          id: 'file-id', name: 'file', path: 'file-id', mime: 'application/octet-stream', size: 0,
+          status: 'pending', error: null, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z', url: downloadUrl,
+        },
+      });
+    }
+    if (url === downloadUrl) return new Response(null, { status: 404 });
+    throw new Error(`Unexpected URL ${url}`);
+  };
+
+  await assert.rejects(
+    new Storages(credentialStack(fetcher)).download('storage-id', 'file-id'),
+    (error) => error.status === 404 && error.message === 'The file upload has not finished yet. Try the download again shortly.',
+  );
 });
 
 test('stream upload requires and forwards an exact byte size before creating a file record', async () => {

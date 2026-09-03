@@ -16,7 +16,7 @@ export class MailClient {
       headers['idempotency-key'] = input.idempotencyKey;
     }
     const body = {
-      from: input.from,
+      from: input.sender,
       to: input.to,
       subject: input.subject,
       ...(input.html !== undefined ? { html: input.html } : {}),

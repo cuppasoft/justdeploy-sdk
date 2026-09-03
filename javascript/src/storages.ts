@@ -7,7 +7,6 @@ function withoutUrl(file: FileInfo): StoredFile {
   const { url: _url, ...stored } = file;
   return stored;
 }
-
 function requiresDuplex(body: UploadBody): boolean {
   return typeof body === 'object' && body !== null && (body instanceof ReadableStream || Symbol.asyncIterator in body);
 }
@@ -40,23 +39,36 @@ function uploadByteLength(body: UploadBody, supplied: number | undefined): numbe
 
 function protectedStream(stream: ReadableStream<Uint8Array>): ReadableStream<Uint8Array> {
   const reader = stream.getReader();
+  let released = false;
+  const release = (): void => {
+    if (released) return;
+    released = true;
+    reader.releaseLock();
+  };
+
   return new ReadableStream<Uint8Array>({
     async pull(controller) {
       try {
         const result = await reader.read();
         if (result.done) {
-          reader.releaseLock();
+          release();
           controller.close();
         } else {
           controller.enqueue(result.value);
         }
       } catch {
-        reader.releaseLock();
+        release();
         controller.error(new JustDeployError('The file transfer was interrupted.'));
       }
     },
     async cancel(reason) {
-      await reader.cancel(reason).catch(() => undefined);
+      try {
+        await reader.cancel(reason);
+      } catch {
+        // Consumer cancellation is already final; only ensure the lock is released.
+      } finally {
+        release();
+      }
     },
   });
 }
@@ -148,7 +160,11 @@ export class Storages {
     });
     if (!downloaded.ok) {
       await downloaded.body?.cancel().catch(() => undefined);
-      throw new JustDeployError(`The file download failed with status ${downloaded.status}.`, { status: downloaded.status });
+      const message =
+        file.status === 'pending' && (downloaded.status === 403 || downloaded.status === 404)
+          ? 'The file upload has not finished yet. Try the download again shortly.'
+          : `The file download failed with status ${downloaded.status}.`;
+      throw new JustDeployError(message, { status: downloaded.status });
     }
     if (!downloaded.body) throw new JustDeployError('The file download returned no data.', { status: downloaded.status });
 
@@ -174,8 +190,8 @@ export class Storages {
     try {
       await this.deleteFile(storageId, fileId);
     } catch {
-      // Keep the transfer failure as the actionable error. The server can clean a
-      // remaining pending record later if this best-effort compensation also fails.
+      // Keep the transfer failure as the actionable error. This compensation is
+      // best-effort because the API itself may be unreachable.
     }
   }
 }

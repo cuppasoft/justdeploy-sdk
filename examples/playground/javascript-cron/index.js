@@ -81,7 +81,7 @@ exports.handler = async () => {
 
     const idempotencyKey = `javascript-sdk-check-${randomUUID()}`;
     const mailInput = {
-      from: sender,
+      sender,
       to: 'success@simulator.amazonses.com',
       subject: 'JustDeploy JavaScript SDK development check',
       text: 'This message validates the development-only SDK path.',

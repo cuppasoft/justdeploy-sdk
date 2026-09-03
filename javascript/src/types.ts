@@ -124,7 +124,7 @@ export interface Mail {
 }
 
 export interface SendMailInput {
-  from: string;
+  sender: string;
   to: string;
   subject: string;
   html?: string;

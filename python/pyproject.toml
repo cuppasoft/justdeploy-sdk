@@ -45,7 +45,9 @@ path = "src/justdeploy/_version.py"
 packages = ["src/justdeploy"]
 
 [tool.hatch.build.targets.sdist]
-exclude = ["/tests", ".gitignore", "/uv.lock"]
+# Hatch standard sdists always include the repository .gitignore, so listing it
+# here would be a no-op. Tests and the local lockfile remain intentionally private.
+exclude = ["/tests", "/uv.lock"]
 
 [tool.pytest.ini_options]
 addopts = "-q"

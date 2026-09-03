@@ -84,7 +84,7 @@ def handler(_event: object, _context: object) -> dict[str, object]:
             sender = os.environ["SDK_TEST_FROM"]
             idempotency_key = f"python-sdk-check-{uuid.uuid4()}"
             mail_input = {
-                "from_address": sender,
+                "sender": sender,
                 "to": "success@simulator.amazonses.com",
                 "subject": "JustDeploy Python SDK development check",
                 "text": "This message validates the development-only SDK path.",

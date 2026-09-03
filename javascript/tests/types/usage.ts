@@ -21,7 +21,7 @@ async function useSdk(databaseId: string, storageId: string): Promise<void> {
   });
   await client.storages.deleteFile(storageId, file.id);
 
-  const message: SendMailInput = { from: 'hello@example.com', to: 'user@example.net', subject: 'Hello', text: 'Hi' };
+  const message: SendMailInput = { sender: 'hello@example.com', to: 'user@example.net', subject: 'Hello', text: 'Hi' };
   await client.mail.send(message);
   void query;
 }

@@ -3,6 +3,8 @@
 The official JustDeploy SDK for server-side Node.js 22 and 24. The package includes ESM, CommonJS, and TypeScript declarations.
 
 > This package has not been published yet.
+>
+> SDK authentication is currently enabled only for deployed projects in the Development Playground. Local SDK Credential exchange and deployed Production SDK calls remain disabled until the separate Production rollout.
 
 ## Client
 
@@ -22,7 +24,7 @@ const { JustDeploy } = require('@justdeploy/sdk');
 const justdeploy = new JustDeploy();
 ```
 
-For local development, set both `JUSTDEPLOY_ACCESS_KEY` and `JUSTDEPLOY_SECRET_KEY` in the process environment. A deployed JustDeploy application needs no SDK configuration. If a deployed application explicitly keeps both variables, the SDK accepts and prioritizes them; build feedback will recommend the simpler automatic deployment identity without blocking the build.
+After the Production rollout, local development sets both `JUSTDEPLOY_ACCESS_KEY` and `JUSTDEPLOY_SECRET_KEY` in the process environment, while a deployed JustDeploy application needs no SDK configuration. Today, only the no-configuration path of a project deployed in the Development Playground is enabled. If a deployed application explicitly keeps both variables, the SDK accepts and prioritizes them; build feedback will recommend the simpler automatic deployment identity without blocking the build.
 
 ## Database
 
@@ -67,12 +69,13 @@ await justdeploy.storages.deleteFile(storageId, file.id);
 
 `upload` accepts a string, `Blob`, byte array, web stream, or async byte iterable. Upload and download bytes stream directly to the signed Storage URL without a JustDeploy authentication header.
 For a web stream or async iterable, also pass the exact byte length as `size`; sized values such as strings, blobs, and byte arrays are measured automatically.
+If a download races with a still-finishing upload, retry after the SDK's clear pending-upload error.
 
 ## Mail
 
 ```ts
 const mail = await justdeploy.mail.send({
-  from: 'hello@your-verified-domain.example',
+  sender: 'hello@your-verified-domain.example',
   to: 'user@example.com',
   subject: 'Welcome',
   text: 'Thanks for joining.',

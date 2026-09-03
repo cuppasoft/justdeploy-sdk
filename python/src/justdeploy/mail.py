@@ -8,7 +8,7 @@ from .types import Mail, MailPage
 
 def _mail_request(
     *,
-    from_address: str,
+    sender: str,
     to: str,
     subject: str,
     html: str | None,
@@ -18,7 +18,7 @@ def _mail_request(
 ) -> tuple[dict[str, str], dict[str, str]]:
     if idempotency_key is not None and (not isinstance(idempotency_key, str) or not 1 <= len(idempotency_key) <= 256):
         raise JustDeployValidationError("idempotency_key must contain between 1 and 256 characters.")
-    body = {"from": from_address, "to": to, "subject": subject}
+    body = {"from": sender, "to": to, "subject": subject}
     if html is not None:
         body["html"] = html
     if text is not None:
@@ -36,7 +36,7 @@ class MailClient:
     def send(
         self,
         *,
-        from_address: str,
+        sender: str,
         to: str,
         subject: str,
         html: str | None = None,
@@ -45,7 +45,7 @@ class MailClient:
         idempotency_key: str | None = None,
     ) -> Mail:
         body, headers = _mail_request(
-            from_address=from_address,
+            sender=sender,
             to=to,
             subject=subject,
             html=html,
@@ -71,7 +71,7 @@ class AsyncMailClient:
     async def send(
         self,
         *,
-        from_address: str,
+        sender: str,
         to: str,
         subject: str,
         html: str | None = None,
@@ -80,7 +80,7 @@ class AsyncMailClient:
         idempotency_key: str | None = None,
     ) -> Mail:
         body, headers = _mail_request(
-            from_address=from_address,
+            sender=sender,
             to=to,
             subject=subject,
             html=html,

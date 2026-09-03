@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import suppress
 from typing import cast
 
@@ -7,6 +8,15 @@ from ._transport import AsyncTransport, SyncTransport
 from ._validation import page_query, path_segment
 from .errors import JustDeployError, JustDeployValidationError
 from .types import AsyncFileDownload, AsyncUploadBody, FileDownload, FileInfo, FilePage, Storage, StoredFile, SyncUploadBody
+
+_ASYNC_CLEANUP_TASKS: set[asyncio.Task[None]] = set()
+
+
+def _finish_async_cleanup(task: asyncio.Task[None]) -> None:
+    _ASYNC_CLEANUP_TASKS.discard(task)
+    # Cleanup is deliberately best-effort and must not replace the upload error.
+    with suppress(asyncio.CancelledError, Exception):
+        task.result()
 
 
 def _without_url(file: FileInfo) -> StoredFile:
@@ -24,6 +34,12 @@ def _content_length(response: httpx.Response) -> int | None:
     except ValueError:
         return None
     return value if value >= 0 else None
+
+
+def _download_error(file: FileInfo, status: int) -> JustDeployError:
+    if file["status"] == "pending" and status in {403, 404}:
+        return JustDeployError("The file upload has not finished yet. Try the download again shortly.", status=status)
+    return JustDeployError(f"The file download failed with status {status}.", status=status)
 
 
 def _known_upload_size(data: SyncUploadBody | AsyncUploadBody) -> int | None:
@@ -114,8 +130,9 @@ class Storages:
             self._cleanup_failed_upload(storage_id, file["id"])
             raise
         if not response.is_success:
-            response.close()
             self._cleanup_failed_upload(storage_id, file["id"])
+            with suppress(Exception):
+                response.close()
             raise JustDeployError(f"The file upload failed with status {response.status_code}.", status=response.status_code)
         response.close()
         return _without_url(file)
@@ -124,8 +141,9 @@ class Storages:
         file = self.get_file(storage_id, file_id)
         response = self._transport.presigned_download(file["url"])
         if not response.is_success:
-            response.close()
-            raise JustDeployError(f"The file download failed with status {response.status_code}.", status=response.status_code)
+            with suppress(Exception):
+                response.close()
+            raise _download_error(file, response.status_code)
         return FileDownload(_without_url(file), response.headers.get("content-type"), _content_length(response), response)
 
     def delete_file(self, storage_id: str, file_id: str) -> None:
@@ -188,12 +206,18 @@ class AsyncStorages:
         file = files[0]
         try:
             response = await self._transport.presigned_upload(file["url"], mime=mime, data=data, size=content_length)
-        except JustDeployError:
+        except (JustDeployError, asyncio.CancelledError):
             await self._cleanup_failed_upload(storage_id, file["id"])
             raise
         if not response.is_success:
-            await response.aclose()
-            await self._cleanup_failed_upload(storage_id, file["id"])
+            # Cancel the pending row before awaiting response cleanup. If the caller
+            # cancels while aclose() is running, the server has already received the
+            # compensating DELETE.
+            try:
+                await self._cleanup_failed_upload(storage_id, file["id"])
+            finally:
+                with suppress(Exception):
+                    await response.aclose()
             raise JustDeployError(f"The file upload failed with status {response.status_code}.", status=response.status_code)
         await response.aclose()
         return _without_url(file)
@@ -202,8 +226,9 @@ class AsyncStorages:
         file = await self.get_file(storage_id, file_id)
         response = await self._transport.presigned_download(file["url"])
         if not response.is_success:
-            await response.aclose()
-            raise JustDeployError(f"The file download failed with status {response.status_code}.", status=response.status_code)
+            with suppress(Exception):
+                await response.aclose()
+            raise _download_error(file, response.status_code)
         return AsyncFileDownload(_without_url(file), response.headers.get("content-type"), _content_length(response), response)
 
     async def delete_file(self, storage_id: str, file_id: str) -> None:
@@ -213,5 +238,10 @@ class AsyncStorages:
         )
 
     async def _cleanup_failed_upload(self, storage_id: str, file_id: str) -> None:
+        cleanup = asyncio.create_task(self.delete_file(storage_id, file_id))
+        _ASYNC_CLEANUP_TASKS.add(cleanup)
+        cleanup.add_done_callback(_finish_async_cleanup)
         with suppress(JustDeployError):
-            await self.delete_file(storage_id, file_id)
+            # A second task cancellation may interrupt this await, but shield keeps
+            # the compensating DELETE alive long enough to finish in the background.
+            await asyncio.shield(cleanup)
