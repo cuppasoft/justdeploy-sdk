@@ -1,6 +1,6 @@
 # Contributing
 
-JustDeploy SDK is being prepared for its first release. Please open an issue before starting a large change so the Node.js and Python APIs can stay aligned.
+JustDeploy SDK maintains matching Node.js and Python releases. Please open an issue before starting a large change so both APIs can stay aligned.
 
 Run the complete checks before submitting a change:
 

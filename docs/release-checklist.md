@@ -1,6 +1,6 @@
 # First release checklist
 
-The first Node.js and Python release is stable `0.1.0`. Publishing and Production rollout are separate approval gates.
+Stable `0.1.0` was published to npm and PyPI on 2026-09-04 after explicit operator approval. Publishing and Production rollout are separate approval gates.
 
 ## Development Playground server readiness
 
@@ -19,16 +19,18 @@ The first Node.js and Python release is stable `0.1.0`. Publishing and Productio
 - [x] Confirm another organization is rejected and signed file requests contain no JustDeploy authentication header.
 - [x] Confirm an expired-session GET is repeated once and no mutation is automatically repeated.
 - [x] Generate the Development Playground Database, Storage, and Mail guide variants.
+- [x] Install `0.1.0` from PyPI in clean Python 3.12, 3.13, and 3.14 environments and import both sync and async clients.
+- [x] Install `0.1.0` from npm by package name in clean Node.js 22 and 24 environments and import both ESM and CommonJS exports.
 - [ ] Install only from the public registries and verify that a clean Playground project can follow each guide without repository-only knowledge.
 
 ## Package publishing gate
 
 - [x] Node.js and Python versions match and all local CI commands pass.
 - [x] Package archives contain the license and type information, with no test fixture, key, Credential, token, or identity file.
-- [x] npm `@justdeploy/sdk` and PyPI `justdeploy-sdk` were unregistered when checked on 2026-09-03.
-- [ ] Recheck both package names and publishing access immediately before publishing.
-- [ ] Decide whether to publish from the operator machine or add a separately approved trusted-publishing workflow. Do not enable npm provenance without an OIDC publishing workflow.
-- [ ] Publish stable `0.1.0` to npm and PyPI only after explicit operator approval. This repository intentionally contains no automatic publishing workflow.
+- [x] Recheck both package names and publishing access immediately before publishing; the operator owns the npm `justdeploy` organization.
+- [x] Publish manually from the operator machine, without an automatic publishing workflow or npm provenance.
+- [x] Publish stable `0.1.0` to npm and PyPI only after explicit operator approval.
+- [x] Confirm npm public visibility and download all three published archives without authentication; their bytes match the reviewed release files.
 
 ## Production gate
 

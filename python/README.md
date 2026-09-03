@@ -2,9 +2,13 @@
 
 The official JustDeploy SDK for server-side CPython 3.12, 3.13, and 3.14. Import it as `justdeploy`.
 
-> This package has not been published yet.
->
 > SDK authentication is currently enabled only for deployed projects in the Development Playground. Local SDK Credential exchange and deployed Production SDK calls remain disabled until the separate Production rollout.
+
+## Install
+
+```bash
+python -m pip install justdeploy-sdk==0.1.0
+```
 
 ## Client
 

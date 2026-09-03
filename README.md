@@ -2,7 +2,7 @@
 
 Official server-side SDKs for [JustDeploy](https://justdeploy.ai).
 
-> The SDK and Development server integration are implemented and have passed clean-runtime and live Playground checks for the first stable `0.1.0` release. The packages have not been published. Do not install them from npm or PyPI until the first release is announced.
+> Version `0.1.0` was published to [npm](https://www.npmjs.com/package/@justdeploy/sdk) and [PyPI](https://pypi.org/project/justdeploy-sdk/0.1.0/) on 2026-09-04. Package availability and Production authentication rollout are separate milestones.
 >
 > SDK authentication is currently enabled only for deployed projects in the Development Playground. A local client with Credential environment variables connects to Production, and Production SDK authentication is not enabled yet. Both paths will be announced only after the separate Production rollout.
 
@@ -14,6 +14,16 @@ Official server-side SDKs for [JustDeploy](https://justdeploy.ai).
 | Python                | CPython 3.12, 3.13 and 3.14 | PyPI `justdeploy-sdk`, import `justdeploy` |
 
 Both packages cover Database, Storage, and Mail. They are for server applications only; Browser, Edge Runtime, Deno, Bun, Java, Go, and Rust are not supported. This repository does not provide a CLI or a generic raw API client.
+
+## Install
+
+```bash
+npm install @justdeploy/sdk@0.1.0
+```
+
+```bash
+python -m pip install justdeploy-sdk==0.1.0
+```
 
 ## Quick start (after Production rollout)
 
@@ -91,7 +101,22 @@ uv run pip-audit
 uv build
 ```
 
-No command in this repository publishes a package. See [CONTRIBUTING.md](CONTRIBUTING.md) before changing both language surfaces, and report security issues through [SECURITY.md](SECURITY.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md) before changing both language surfaces, and report security issues through [SECURITY.md](SECURITY.md).
+
+## Publishing (operator only)
+
+Publishing requires explicit approval and the [release checklist](docs/release-checklist.md). There is no automated publishing workflow. Publish only the exact archives already reviewed; replace `<version>` below with a new version, never an existing release.
+
+```bash
+# From javascript/, after building and reviewing npm pack output:
+npm publish "./justdeploy-sdk-<version>.tgz" --access public --tag latest --provenance=false
+
+# From python/, after building and reviewing uv build output:
+uvx twine check --strict "dist/justdeploy_sdk-<version>-py3-none-any.whl" "dist/justdeploy_sdk-<version>.tar.gz"
+uvx twine upload --repository-url https://upload.pypi.org/legacy/ "dist/justdeploy_sdk-<version>-py3-none-any.whl" "dist/justdeploy_sdk-<version>.tar.gz"
+```
+
+Complete npm's browser authentication when prompted. Enter the PyPI token only at the hidden terminal prompt, not in the command, chat, or repository.
 
 ## License
 
