@@ -9,6 +9,7 @@ identity.json
 # JavaScript
 node_modules/
 dist/
+*.tgz
 coverage/
 *.tsbuildinfo
 

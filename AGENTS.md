@@ -6,7 +6,7 @@ This repository contains the public Node.js and Python SDKs for JustDeploy.
 
 - Support Node.js and Python only. Keep both SDKs on the same version and feature set.
 - Support server applications only. Do not add Browser, Edge Runtime, Deno or Bun compatibility.
-- SDK v1 covers Database, Storage and Mail. Do not add a generic raw-request API.
+- The first release covers Database, Storage and Mail. Do not add a generic raw-request API.
 - Do not add a JustDeploy CLI.
 - Keep public APIs small and explicit so an AI can select the correct operation without guessing.
 

@@ -15,7 +15,6 @@ dependencies = [
   "httpx>=0.28,<1",
 ]
 classifiers = [
-  "Development Status :: 3 - Alpha",
   "Intended Audience :: Developers",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.12",
@@ -44,6 +43,9 @@ path = "src/justdeploy/_version.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/justdeploy"]
+
+[tool.hatch.build.targets.sdist]
+exclude = ["/tests", ".gitignore", "/uv.lock"]
 
 [tool.pytest.ini_options]
 addopts = "-q"

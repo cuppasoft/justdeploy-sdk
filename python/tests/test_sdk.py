@@ -22,6 +22,7 @@ from justdeploy import (
     JustDeployAuthenticationError,
     JustDeployConfigurationError,
     JustDeployError,
+    JustDeployValidationError,
 )
 from justdeploy._auth import AsyncAuthManager, SyncAuthManager
 from justdeploy._transport import AsyncTransport, SyncTransport
@@ -369,6 +370,7 @@ def test_presigned_transfers_never_receive_justdeploy_authentication() -> None:
         if request.url.path.endswith("/files") and request.method == "POST":
             return response({"files": [{**file, "status": "pending", "url": upload_url}]}, 201)
         if url == upload_url:
+            assert request.headers["content-length"] == "5"
             return httpx.Response(200)
         if request.url.path.endswith("/files/file-id"):
             return response({"file": {**file, "url": download_url}})
@@ -422,6 +424,7 @@ async def test_async_presigned_transfers_are_streamed_without_authentication() -
         if request.url.path.endswith("/files") and request.method == "POST":
             return response({"files": [{**file, "status": "pending", "url": upload_url}]}, 201)
         if url == upload_url:
+            assert request.headers["content-length"] == "5"
             assert await request.aread() == b"hello"
             return httpx.Response(200)
         if request.url.path.endswith("/files/file-id"):
@@ -434,7 +437,7 @@ async def test_async_presigned_transfers_are_streamed_without_authentication() -
     client.headers.update({"authorization": "Bearer must-not-leak", "x-justdeploy-sdk": "must-not-leak", "cookie": "must-not-leak=1"})
     storages = AsyncStorages(transport)
     async with client:
-        uploaded = await storages.upload("storage-id", name="hello.txt", mime="text/plain", data=chunks())
+        uploaded = await storages.upload("storage-id", name="hello.txt", mime="text/plain", data=chunks(), size=5)
         assert "url" not in uploaded
         async with await storages.download("storage-id", "file-id") as downloaded:
             assert b"".join([chunk async for chunk in downloaded.aiter_bytes()]) == b"hello"
@@ -444,6 +447,60 @@ async def test_async_presigned_transfers_are_streamed_without_authentication() -
             assert "authorization" not in request.headers
             assert "x-justdeploy-sdk" not in request.headers
             assert "cookie" not in request.headers
+
+
+def test_stream_upload_requires_size_before_creating_a_file_record() -> None:
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        raise AssertionError("No request should be sent for an invalid stream upload.")
+
+    client, transport = sync_stack(handler)
+    storages = Storages(transport)
+    with client:
+        with pytest.raises(JustDeployValidationError, match="size is required"):
+            storages.upload("storage-id", name="hello.txt", mime="text/plain", data=iter([b"hello"]))
+        assert requests == []
+
+        with pytest.raises(JustDeployValidationError, match="does not match"):
+            storages.upload("storage-id", name="hello.txt", mime="text/plain", data=b"hello", size=4)
+        assert requests == []
+
+
+def test_failed_upload_removes_its_pending_file_record_and_preserves_the_transfer_error() -> None:
+    requests: list[httpx.Request] = []
+    upload_url = "https://uploads.example.test/object?signature=upload"
+    file = {
+        "id": "file-id",
+        "name": "hello.txt",
+        "path": "file-id",
+        "mime": "text/plain",
+        "size": 0,
+        "status": "pending",
+        "error": None,
+        "createdAt": "2026-01-01T00:00:00.000Z",
+        "updatedAt": "2026-01-01T00:00:00.000Z",
+        "url": upload_url,
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        if request.url.path == "/auth/credential":
+            return session()
+        if request.url.path.endswith("/files") and request.method == "POST":
+            return response({"files": [file]}, 201)
+        if str(request.url) == upload_url:
+            return httpx.Response(501)
+        if request.url.path.endswith("/files/file-id") and request.method == "DELETE":
+            return httpx.Response(200)
+        raise AssertionError(f"Unexpected request: {request.method} {request.url}")
+
+    client, transport = sync_stack(handler)
+    with client, pytest.raises(JustDeployError) as raised:
+        Storages(transport).upload("storage-id", name="hello.txt", mime="text/plain", data=b"hello")
+    assert raised.value.status == 501
+    assert [request.method for request in requests] == ["POST", "POST", "PUT", "DELETE"]
 
 
 def test_structured_error_keeps_api_fields_but_not_request_body() -> None:

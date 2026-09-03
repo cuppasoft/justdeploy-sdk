@@ -91,6 +91,8 @@ export interface UploadInput {
   name: string;
   mime: string;
   data: UploadBody;
+  /** Exact byte length. Required only for ReadableStream and AsyncIterable uploads. */
+  size?: number;
   signal?: AbortSignal;
 }
 

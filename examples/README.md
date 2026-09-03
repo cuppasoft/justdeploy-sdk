@@ -4,6 +4,8 @@ These examples use placeholders and contain no Credential. For local use, place 
 
 The packages are not published yet, so install each package from this repository before running an example.
 
+`playground/` contains release-validation cron fixtures. Copy the locally packed npm archive or Python wheel into the matching directory before zipping it; the archives are intentionally not committed.
+
 | Runtime      | Example                                               |
 | ------------ | ----------------------------------------------------- |
 | Node.js ESM  | [`javascript/database.mjs`](javascript/database.mjs)  |

@@ -12,6 +12,32 @@ function requiresDuplex(body: UploadBody): boolean {
   return typeof body === 'object' && body !== null && (body instanceof ReadableStream || Symbol.asyncIterator in body);
 }
 
+function knownByteLength(body: UploadBody): number | null {
+  if (typeof body === 'string') return new TextEncoder().encode(body).byteLength;
+  if (body instanceof Blob) return body.size;
+  if (body instanceof ArrayBuffer) return body.byteLength;
+  if (body instanceof Uint8Array) return body.byteLength;
+  return null;
+}
+
+function uploadByteLength(body: UploadBody, supplied: number | undefined): number {
+  if (supplied !== undefined && (!Number.isSafeInteger(supplied) || supplied < 0)) {
+    throw new JustDeployValidationError('upload size must be a non-negative safe integer.');
+  }
+
+  const known = knownByteLength(body);
+  if (known !== null) {
+    if (supplied !== undefined && supplied !== known) {
+      throw new JustDeployValidationError(`upload size ${supplied} does not match the ${known}-byte data.`);
+    }
+    return known;
+  }
+  if (supplied === undefined) {
+    throw new JustDeployValidationError('upload size is required when data is streamed. Provide the exact byte length.');
+  }
+  return supplied;
+}
+
 function protectedStream(stream: ReadableStream<Uint8Array>): ReadableStream<Uint8Array> {
   const reader = stream.getReader();
   return new ReadableStream<Uint8Array>({
@@ -70,6 +96,9 @@ export class Storages {
     if (input.data === undefined || input.data === null) {
       throw new JustDeployValidationError('upload data is required.');
     }
+    // S3 presigned PUT rejects HTTP chunked transfer. Validate before creating the
+    // pending file record so an invalid stream cannot leave an orphaned row.
+    const size = uploadByteLength(input.data, input.size);
 
     const createOptions = {
       body: { files: [{ name: input.name, mime: input.mime }] },
@@ -87,16 +116,23 @@ export class Storages {
 
     const request: RequestInit = {
       method: 'PUT',
-      headers: { 'content-type': input.mime },
+      headers: { 'content-type': input.mime, 'content-length': String(size) },
       body: input.data as BodyInit,
       redirect: 'error',
     };
     if (input.signal) request.signal = input.signal;
     if (requiresDuplex(input.data)) (request as RequestInit & { duplex: 'half' }).duplex = 'half';
 
-    const uploaded = await this.transport.presigned(file.url, request);
+    let uploaded: Response;
+    try {
+      uploaded = await this.transport.presigned(file.url, request);
+    } catch (error) {
+      await this.cleanupFailedUpload(storageId, file.id);
+      throw error;
+    }
     if (!uploaded.ok) {
       await uploaded.body?.cancel().catch(() => undefined);
+      await this.cleanupFailedUpload(storageId, file.id);
       throw new JustDeployError(`The file upload failed with status ${uploaded.status}.`, { status: uploaded.status });
     }
     await uploaded.body?.cancel().catch(() => undefined);
@@ -132,5 +168,14 @@ export class Storages {
       `/storages/${pathSegment(storageId, 'storageId')}/files/${pathSegment(fileId, 'fileId')}`,
       options,
     );
+  }
+
+  private async cleanupFailedUpload(storageId: string, fileId: string): Promise<void> {
+    try {
+      await this.deleteFile(storageId, fileId);
+    } catch {
+      // Keep the transfer failure as the actionable error. The server can clean a
+      // remaining pending record later if this best-effort compensation also fails.
+    }
   }
 }

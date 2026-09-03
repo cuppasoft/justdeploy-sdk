@@ -24,7 +24,7 @@ async with AsyncJustDeploy() as justdeploy:
     result = await justdeploy.databases.query("your-database-id", "SELECT * FROM orders")
 ```
 
-For local development, set both `JUSTDEPLOY_ACCESS_KEY` and `JUSTDEPLOY_SECRET_KEY` in the process environment. A deployed JustDeploy application needs no SDK configuration.
+For local development, set both `JUSTDEPLOY_ACCESS_KEY` and `JUSTDEPLOY_SECRET_KEY` in the process environment. A deployed JustDeploy application needs no SDK configuration. If a deployed application explicitly keeps both variables, the SDK accepts and prioritizes them; build feedback will recommend the simpler automatic deployment identity without blocking the build.
 
 ## Database
 
@@ -75,6 +75,7 @@ justdeploy.storages.delete_file(storage_id, file["id"])
 ```
 
 The async download uses `async with` and `async for chunk in download.aiter_bytes()`. Upload and download bytes stream directly to the signed Storage URL without a JustDeploy authentication header.
+When upload data is an iterator or async iterator, pass its exact byte length as `size`. Byte strings and seekable binary files are measured automatically.
 
 ## Mail
 

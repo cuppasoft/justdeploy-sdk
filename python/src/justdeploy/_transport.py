@@ -123,10 +123,15 @@ class SyncTransport:
             raise _api_error(response, payload)
         return payload
 
-    def presigned_upload(self, url: str, *, mime: str, data: SyncUploadBody) -> httpx.Response:
+    def presigned_upload(self, url: str, *, mime: str, data: SyncUploadBody, size: int) -> httpx.Response:
         validated_url = _validate_presigned_url(url)
         try:
-            request = self.client.build_request("PUT", validated_url, headers={"content-type": mime}, content=data)
+            request = self.client.build_request(
+                "PUT",
+                validated_url,
+                headers={"content-type": mime, "content-length": str(size)},
+                content=data,
+            )
             for name in TRANSFER_FORBIDDEN_HEADERS:
                 request.headers.pop(name, None)
             return self.client.send(request, follow_redirects=False)
@@ -199,10 +204,15 @@ class AsyncTransport:
             raise _api_error(response, payload)
         return payload
 
-    async def presigned_upload(self, url: str, *, mime: str, data: AsyncUploadBody) -> httpx.Response:
+    async def presigned_upload(self, url: str, *, mime: str, data: AsyncUploadBody, size: int) -> httpx.Response:
         validated_url = _validate_presigned_url(url)
         try:
-            request = self.client.build_request("PUT", validated_url, headers={"content-type": mime}, content=data)
+            request = self.client.build_request(
+                "PUT",
+                validated_url,
+                headers={"content-type": mime, "content-length": str(size)},
+                content=data,
+            )
             for name in TRANSFER_FORBIDDEN_HEADERS:
                 request.headers.pop(name, None)
             return await self.client.send(request, follow_redirects=False)

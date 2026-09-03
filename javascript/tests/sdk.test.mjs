@@ -8,7 +8,7 @@ import test from 'node:test';
 
 import { AuthManager } from '../dist/esm/auth.js';
 import { Databases } from '../dist/esm/databases.js';
-import { JustDeploy, JustDeployAuthenticationError, JustDeployConfigurationError, JustDeployError } from '../dist/esm/index.js';
+import { JustDeploy, JustDeployAuthenticationError, JustDeployConfigurationError, JustDeployError, JustDeployValidationError } from '../dist/esm/index.js';
 import { MailClient } from '../dist/esm/mail.js';
 import { Storages } from '../dist/esm/storages.js';
 import { Transport } from '../dist/esm/transport.js';
@@ -291,7 +291,66 @@ test('presigned upload and download never receive JustDeploy authentication head
     assert.equal(header(target.init, 'x-justdeploy-sdk'), null);
   }
   const uploadCall = calls.find((call) => call.url === uploadUrl);
-  assert.deepEqual([...new Headers(uploadCall.init.headers).keys()], ['content-type']);
+  assert.deepEqual([...new Headers(uploadCall.init.headers).keys()], ['content-length', 'content-type']);
+  assert.equal(header(uploadCall.init, 'content-length'), '5');
+});
+
+test('stream upload requires and forwards an exact byte size before creating a file record', async () => {
+  const calls = [];
+  const uploadUrl = 'https://uploads.example.test/object?signature=upload';
+  const file = {
+    id: 'file-id', name: 'hello.txt', path: 'file-id', mime: 'text/plain', size: 0,
+    status: 'pending', error: null, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z', url: uploadUrl,
+  };
+  const fetcher = async (input, init) => {
+    const url = String(input);
+    calls.push({ url, init });
+    if (url.includes('/auth/')) return session();
+    if (url.endsWith('/files')) return json({ files: [file] }, 201);
+    if (url === uploadUrl) {
+      assert.equal(header(init, 'content-length'), '5');
+      assert.equal(await new Response(init.body).text(), 'hello');
+      return new Response(null, { status: 200 });
+    }
+    throw new Error(`Unexpected URL ${url}`);
+  };
+  const storages = new Storages(credentialStack(fetcher));
+
+  const missingSize = new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode('hello')); controller.close(); } });
+  await assert.rejects(
+    storages.upload('storage-id', { name: 'hello.txt', mime: 'text/plain', data: missingSize }),
+    (error) => error instanceof JustDeployValidationError && /size is required/.test(error.message),
+  );
+  assert.equal(calls.length, 0);
+
+  const stream = new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode('hello')); controller.close(); } });
+  await storages.upload('storage-id', { name: 'hello.txt', mime: 'text/plain', data: stream, size: 5 });
+  assert.equal(calls.length, 3);
+});
+
+test('failed upload removes its pending file record and preserves the transfer error', async () => {
+  const calls = [];
+  const uploadUrl = 'https://uploads.example.test/object?signature=upload';
+  const file = {
+    id: 'file-id', name: 'hello.txt', path: 'file-id', mime: 'text/plain', size: 0,
+    status: 'pending', error: null, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z', url: uploadUrl,
+  };
+  const fetcher = async (input, init) => {
+    const url = String(input);
+    calls.push({ url, method: init.method });
+    if (url.includes('/auth/')) return session();
+    if (url.endsWith('/files')) return json({ files: [file] }, 201);
+    if (url === uploadUrl) return new Response(null, { status: 501 });
+    if (url.endsWith('/files/file-id') && init.method === 'DELETE') return new Response(null, { status: 200 });
+    throw new Error(`Unexpected URL ${url}`);
+  };
+  const storages = new Storages(credentialStack(fetcher));
+
+  await assert.rejects(
+    storages.upload('storage-id', { name: 'hello.txt', mime: 'text/plain', data: new TextEncoder().encode('hello') }),
+    (error) => error instanceof JustDeployError && error.status === 501,
+  );
+  assert.deepEqual(calls.map(({ method }) => method), ['POST', 'POST', 'PUT', 'DELETE']);
 });
 
 test('structured errors retain safe API fields without retaining request bodies', async () => {
