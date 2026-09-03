@@ -20,7 +20,7 @@ jobs:
         working-directory: javascript
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node }}
           cache: npm
@@ -61,7 +61,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
       - run: node -e "const fs=require('fs'); const npm=require('./javascript/package.json').version; const js=fs.readFileSync('./javascript/src/version.ts','utf8').match(/SDK_VERSION = '([^']+)'/)[1]; const py=fs.readFileSync('./python/src/justdeploy/_version.py','utf8').match(/__version__ = \"([^\"]+)\"/)[1]; if (new Set([npm, js, py]).size !== 1) throw new Error('Package versions differ');"
