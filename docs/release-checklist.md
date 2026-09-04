@@ -35,7 +35,7 @@ Stable `0.1.1` was published to npm and PyPI on 2026-09-04 through the approved 
 - [x] Obtain explicit 0.1.1 publication approval. This is separate from Production deployment approval.
 - [x] Publish the reviewed archives, anonymously verify all three hashes, then clean-install by public package name: 15 tests each on Node.js 22/24 and 28 each on Python 3.12/3.13/3.14, 114 in total.
 - [x] Update the repository release notice, example dependency pins, and Development API/Console guide images to the verified public 0.1.1 together. Verify deployed image contents and all seven API guide responses.
-- [ ] Recheck the seven Console guide responses from an allowed network. The new image is deployed and verified, but the current network receives the existing IP-allowlist 403; the allowlist was not changed.
+- [x] Recheck all fourteen Development API/Console guide responses against the public 0.1.1 contract. Console access succeeded under the existing allowlist; no access policy was changed.
 
 ## GitHub publishing setup
 
@@ -45,6 +45,8 @@ Stable `0.1.1` was published to npm and PyPI on 2026-09-04 through the approved 
 - [x] Publish through GitHub without stored registry tokens and verify anonymous archive downloads.
 
 Account GitHub linking is not publishing authorization. These registry settings are a one-time setup; normal approved releases use the manual GitHub workflow. Keep account two-factor authentication enabled and never add push/tag/release publishing triggers.
+
+The subsequent documentation-only commit `8aea941` has a [failed CI run](https://github.com/cuppasoft/justdeploy-sdk/actions/runs/33832112037): npm's security-audit endpoint timed out on both attempts. Runtime sources and dependency lockfiles are unchanged from the successful publishing commit `726da7c`. This is not a vulnerability finding or a successful current audit; keep the security check enabled and recheck before Production rollout.
 
 ## Completed 0.1.0 publishing gate
 
