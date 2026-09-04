@@ -1,6 +1,6 @@
 # SDK release checklist
 
-Stable `0.1.1` was published to npm and PyPI on 2026-09-04 through the approved [GitHub publishing run](https://github.com/cuppasoft/justdeploy-sdk/actions/runs/33831514520). Production authentication and guides were enabled later that day under separate operator approval. Actual Production mail delivery remains an unperformed follow-up, not a completed check.
+Stable `0.1.1` was published to npm and PyPI on 2026-09-04 through the approved [GitHub publishing run](https://github.com/cuppasoft/justdeploy-sdk/actions/runs/33831514520). Production authentication and guides were enabled later that day under separate operator approval. The operator subsequently confirmed actual receipt of an email sent through the SDK in Production. Production idempotency and the server's `delivered` status remain separately unverified.
 
 ## Development Playground server readiness
 
@@ -46,7 +46,13 @@ Stable `0.1.1` was published to npm and PyPI on 2026-09-04 through the approved 
 
 Account GitHub linking is not publishing authorization. These registry settings are a one-time setup; normal approved releases use the manual GitHub workflow. Keep account two-factor authentication enabled and never add push/tag/release publishing triggers.
 
-Pre-rollout CI evidence on 2026-09-04: commit `efcf13d` [passed every job](https://github.com/cuppasoft/justdeploy-sdk/actions/runs/33842439206), including all five supported runtimes and dependency security audits. This resolved the earlier documentation commit's npm audit connection timeout without bypassing the check. Runtime sources and dependency lockfiles remain unchanged from the successful publishing commit `726da7c`.
+## Latest CI verification — 2026-09-04
+
+Commit `a628d91`, [run 33855763097, attempt 2](https://github.com/cuppasoft/justdeploy-sdk/actions/runs/33855763097/attempts/2), passed all six jobs: Node.js 22/24, Python 3.12/3.13/3.14, and package-version matching. The Node.js 24 audit used the 120-second request timeout and reported `found 0 vulnerabilities`; type checking, tests, and package checks then passed. No security check was skipped.
+
+The preceding failures coincided with npm's official [Security Audit endpoint incident](https://status.npmjs.org/incidents/l4f53bbr9200), reported at 11:29 UTC. Normal package requests worked while audit requests timed out. The 120-second limit did not immediately resolve the outage: attempt 1 exhausted its three attempts, and the later retry passed. This records our CI's recovery, not a guarantee of npm-wide recovery or future availability. Do not disable the audit or treat a timeout as a pass.
+
+The earlier pre-rollout commit `efcf13d` also [passed every job](https://github.com/cuppasoft/justdeploy-sdk/actions/runs/33842439206). Runtime sources and dependency lockfiles remain unchanged from the successful publishing commit `726da7c`; the timeout adjustment and this documentation update do not republish packages or deploy the server.
 
 ## Completed 0.1.0 publishing gate
 
@@ -72,8 +78,9 @@ Pre-rollout CI evidence on 2026-09-04: commit `efcf13d` [passed every job](https
 - [x] Check eight representative Production API/Console guides. Correct the stale Development availability notice, deploy both Development guide servers, and verify fourteen actual responses.
 - [x] Recheck five existing Production Node web applications without changing their code or configuration: 42 HTTP/file/access checks and successful SDK authentication against Production from each exact deployment image. Existing direct-Credential applications still work; this isolated image check does not imply that their source adopted the SDK or that it covers Python/cron.
 - [x] Delete the 466 exactly matched legacy temporary build archives, retaining twelve original sources and rollback material. Delete the two test applications and the temporary verification Credential; customer keys remain intact. Follow-up checks confirmed that asynchronous cleanup also removed both remaining test network resources.
-- [ ] Send an approved Production test email and verify idempotency plus actual delivery. Only Mail listing and invalid-sender rejection were exercised in Production; no email has been sent for this check.
+- [x] Actual receipt of an SDK-sent Production email, confirmed by the operator on 2026-09-04. This records the operator's report, not an independent inspection of the mail record; no particular SDK version, language, or authentication path is inferred from it.
+- [ ] Verify Production idempotency and the mail record's `delivered` status. Receipt confirmation alone does not establish either check. Any additional send requires separate approval.
 
-Database CRUD/DDL and actual Mail delivery were verified in Development, not repeated in Production. Production Database sampling deliberately remained read-only and did not modify customer data or schema. Do not describe these narrower checks as a full Production CRUD/Mail pass.
+Database CRUD/DDL and Mail idempotency plus server delivery status were verified in Development, not repeated in Production. Initial agent-led Production Mail sampling covered listing and invalid-sender rejection; actual receipt was subsequently confirmed by the operator as recorded above. Production Database sampling deliberately remained read-only and did not modify customer data or schema. Do not describe these narrower checks as a full Production CRUD/Mail pass.
 
-The server repository's `docs/proposals/sdk.md` records the canonical target inventory, deployed source, verification scope, and recovery procedure. Completed Development simulations and the 114 public-install checks were not repeated in Production. This documentation update does not publish new archives; the immutable 0.1.1 registry files retain their publication-time README.
+On 2026-09-04, the completed server proposals were absorbed into its specifications and this repository's documentation. The server repository's `docs/specs/ops.md` records the canonical rollout inventory, deployed source, verification scope, and recovery procedure; its root README contains the read-only preflight commands. Remaining Production Mail idempotency and status checks are tracked in `docs/proposals/misc-roadmap.md`. Completed Development simulations and the 114 public-install checks were not repeated in Production. This documentation update does not publish new archives; the immutable 0.1.1 registry files retain their publication-time README.

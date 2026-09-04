@@ -15,7 +15,7 @@ Version `0.1.1` fixes Python 3.14 method inspection and reports the transferred 
 | JavaScript/TypeScript | Node.js 22 and 24           | npm `@justdeploy/sdk`                      |
 | Python                | CPython 3.12, 3.13 and 3.14 | PyPI `justdeploy-sdk`, import `justdeploy` |
 
-Both packages cover Database, Storage, and Mail. They are for server applications only; Browser, Edge Runtime, Deno, Bun, Java, Go, and Rust are not supported. This repository does not provide a CLI or a generic raw API client.
+Both packages cover Database, Storage, and Mail. They are for server applications only; Browser, Edge Runtime, Deno, Bun, Java, Go, and Rust are not supported. There is no JustDeploy CLI, separate SDK login, configuration file, proxy, or generic raw API client.
 
 ## Install
 
@@ -64,16 +64,28 @@ See the language guides for the complete small API:
 
 The client has no configuration arguments and follows one fixed order:
 
-1. If both Credential environment variables exist, exchange them for a short-lived session.
+1. If both Credential environment variables exist, exchange them through `POST /auth/credential` for a 10-minute session.
 2. Otherwise, use `/opt/justdeploy/identity.json`, which JustDeploy adds during deployment.
 3. If neither source exists, stop with a clear authentication error.
 
-One missing or empty Credential variable is an error. A rejected Credential never falls back to the deployment identity. Sessions stay in memory, are refreshed near expiration, and are shared by concurrent requests.
+One missing or empty Credential variable is an error. A rejected Credential never falls back to the deployment identity. The identity path signs `POST /auth/build` to obtain the same 10-minute session; it does not use AWS STS or cloud-specific credentials. Sessions stay in memory. A request made within three minutes of expiry refreshes the session, and concurrent requests on the same client share that exchange. There is no background refresh loop.
+
+The identity file's `apiBaseUrl` selects the deployment's API origin even when Credential environment variables take priority. Without an identity file, the client always uses `https://api.justdeploy.net`. There is no API URL override or constructor Credential argument, and the SDK does not load `.env` files.
 
 A deployed application may keep explicit Credential environment variables; the SDK will continue to use them. JustDeploy CI/CD does not remove them or block the build. When it confirms that an application uses this SDK and directly supplies a Credential, build feedback recommends the simpler automatic deployment identity without exposing the Credential value.
 
-Authentication is attached only to the configured JustDeploy API. Presigned Storage upload and download requests never receive the Credential, session token, or SDK header.
-If a file is requested while its upload is still finishing, the SDK returns a clear retry-later error instead of exposing the Storage transfer response.
+In Production and the Development Playground, sessions can access every External API in their own organization, including Credential creation. The SDK's three resource groups do not narrow server permissions, and resources are not bound to an individual project. Other Development organizations are not enabled for SDK authentication.
+
+## Request behavior
+
+- Authentication is attached only to SDK-created JustDeploy API requests. Other hosts and presigned Storage upload/download requests never receive the Credential, session token, or SDK header.
+- Authentication exchanges have a 10-second timeout; ordinary JustDeploy API requests have a 30-second timeout. Node.js accepts `AbortSignal`, and Python async calls use normal task cancellation.
+- After a 401, only a GET may refresh the session and repeat once. Database queries, Mail sends, and file mutations are never automatically repeated.
+- File transfers stream without collecting the entire file in memory. A transfer that has started is not interrupted just because the session expires. For stream inputs, provide the exact byte count as described in the language guides.
+- A successful upload returns the transferred `size`. Server metadata may still be `pending`; read it again after it becomes `active` if the final record is needed. A download requested too early returns a clear retry-later error. Failed or canceled uploads try to remove the pending file record while preserving the original error or cancellation.
+- Mail uses the argument `sender` in both languages and sends it as the API's `from` field. Use a stable idempotency key if the caller retries; an accepted send is not proof of delivery.
+
+Language-specific errors and streaming examples are in the [Node.js](javascript/README.md) and [Python](python/README.md) guides. Do not log authentication values, signatures, SQL, or file contents.
 
 ## Development
 
@@ -101,6 +113,8 @@ uv run pip-audit
 uv build
 ```
 
+The [CI workflow](.github/workflows/ci.yml) audits the shared JavaScript dependency lockfile once, on Node.js 24. That step allows 120 seconds per npm request and at most three audit attempts, with 10 seconds between attempts; other npm steps retain their 30-second request timeout. A high-severity finding or unavailable audit still fails CI and blocks publishing. An audit connection timeout is not a clean security result and does not require registry login. Recorded results are in the [release checklist](docs/release-checklist.md).
+
 See [CONTRIBUTING.md](CONTRIBUTING.md) before changing both language surfaces, and report security issues through [SECURITY.md](SECURITY.md).
 
 ## Publishing (operator only)
@@ -123,7 +137,7 @@ gh workflow run publish.yml --repo cuppasoft/justdeploy-sdk --ref main \
 
 The workflow checks all five supported runtimes, validates versions and package contents, and keeps the three archives plus their SHA-256 checksums as a release artifact. The publishing jobs use those exact archives and authenticate through GitHub; no registry token or routine browser confirmation is needed. A final check downloads all three public files without authentication and compares their checksums.
 
-After a partial failure, inspect what is already public and rerun only the failed jobs. Do not overwrite an existing version or restart a successful npm publish. After both registries pass verification, clean-install by public package name, then update this README, example pins, and Development guides together.
+After a partial failure, inspect what is already public and rerun only the failed jobs. Do not overwrite or delete an existing version, or restart a successful npm publish. If a published release has a defect, obtain approval to deprecate it on npm or yank it on PyPI, then publish a new patch version. After both registries pass verification, clean-install by public package name, then update this README, example pins, and Development guides together.
 
 ## License
 
