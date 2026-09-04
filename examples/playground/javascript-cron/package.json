@@ -3,6 +3,6 @@
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "@justdeploy/sdk": "0.2.0"
+    "@justdeploy/sdk": "0.2.1"
   }
 }

@@ -7,7 +7,7 @@ Production supports local Credential authentication and automatic identity in de
 ## Install
 
 ```bash
-python -m pip install justdeploy-sdk==0.2.0
+python -m pip install justdeploy-sdk==0.2.1
 ```
 
 ## Client

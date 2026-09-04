@@ -1,6 +1,6 @@
 {
   "name": "@justdeploy/sdk",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Official server-side JavaScript and TypeScript SDK for JustDeploy",
   "license": "Apache-2.0",
   "author": "CUPPASOFT LTD",
@@ -38,7 +38,7 @@
     "README.md"
   ],
   "engines": {
-    "node": "^22.0.0 || ^24.0.0"
+    "node": "^22.0.0 || ^24.0.0 || ^26.0.0"
   },
   "sideEffects": false,
   "scripts": {

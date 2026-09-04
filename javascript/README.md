@@ -1,13 +1,13 @@
 # `@justdeploy/sdk`
 
-The official JustDeploy SDK for server-side Node.js 22 and 24. The package includes ESM, CommonJS, and TypeScript declarations.
+The official JustDeploy SDK for server-side Node.js 22, 24 and 26. The package includes ESM, CommonJS, and TypeScript declarations.
 
 Production supports local Credential authentication and automatic identity in deployed web, API, and cron applications. Development SDK access remains limited to Playground.
 
 ## Install
 
 ```bash
-npm install @justdeploy/sdk@0.2.0
+npm install @justdeploy/sdk@0.2.1
 ```
 
 ## Client

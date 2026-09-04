@@ -5,7 +5,7 @@ This is a reusable checklist for future releases, not unfinished work for the cu
 ## Candidate checks
 
 - [ ] Match the Node.js and Python versions, public behavior, examples and documentation.
-- [ ] Pass CI on Node.js 22/24 and Python 3.12/3.13/3.14, including dependency security checks. Audit timeouts are failures, not clean results.
+- [ ] Pass CI on Node.js 22/24/26 and Python 3.12/3.13/3.14, including dependency security checks. Audit timeouts are failures, not clean results.
 - [ ] Inspect the npm archive, wheel and sdist for license, types, expected files and absence of secrets or customer data.
 - [ ] Install the candidate archives in clean environments; check ESM/CommonJS and Python sync/async clients.
 - [ ] Verify local Credential authentication, automatic deployed identity, environment-variable priority, cross-organization rejection and secret-free errors.

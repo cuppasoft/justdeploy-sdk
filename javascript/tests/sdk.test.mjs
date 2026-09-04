@@ -18,6 +18,26 @@ const API = 'https://api.justdeploy.net';
 const ORG = 'abcdefghijklmnop';
 const EXPIRY = '2099-01-01T00:00:00.000Z';
 
+test('only supported Node majors can construct a client in ESM and CommonJS', () => {
+  const descriptor = Object.getOwnPropertyDescriptor(process.versions, 'node');
+  const require = createRequire(import.meta.url);
+  const CommonJSClient = require('../dist/cjs/index.js').JustDeploy;
+  try {
+    for (const version of ['22.0.0', '24.0.0', '26.0.0', '26.8.1']) {
+      Object.defineProperty(process.versions, 'node', { ...descriptor, value: version });
+      assert.doesNotThrow(() => new JustDeploy());
+      assert.doesNotThrow(() => new CommonJSClient());
+    }
+    for (const version of ['20.0.0', '25.0.0', '27.0.0', undefined]) {
+      Object.defineProperty(process.versions, 'node', { ...descriptor, value: version });
+      assert.throws(() => new JustDeploy(), /supports server-side Node.js 22, 24 and 26 only/);
+      assert.throws(() => new CommonJSClient(), /supports server-side Node.js 22, 24 and 26 only/);
+    }
+  } finally {
+    Object.defineProperty(process.versions, 'node', descriptor);
+  }
+});
+
 function json(payload, status = 200, headers = {}) {
   return new Response(JSON.stringify(payload), {
     status,

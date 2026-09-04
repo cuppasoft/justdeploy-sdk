@@ -12,11 +12,11 @@ export class JustDeploy {
 
   constructor() {
     if (typeof process === 'undefined' || !process.versions?.node) {
-      throw new JustDeployConfigurationError('The JustDeploy SDK supports server-side Node.js 22 and 24 only.');
+      throw new JustDeployConfigurationError('The JustDeploy SDK supports server-side Node.js 22, 24 and 26 only.');
     }
     const major = Number(process.versions.node.split('.')[0]);
-    if (major !== 22 && major !== 24) {
-      throw new JustDeployConfigurationError('The JustDeploy SDK supports server-side Node.js 22 and 24 only.');
+    if (![22, 24, 26].includes(major)) {
+      throw new JustDeployConfigurationError('The JustDeploy SDK supports server-side Node.js 22, 24 and 26 only.');
     }
     const transport = new Transport(new AuthManager());
     this.databases = new Databases(transport);
