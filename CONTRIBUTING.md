@@ -29,6 +29,6 @@ When submitting a pull request:
 - Add tests for new behavior and regressions.
 - Update user-facing documentation and examples.
 - Do not include credentials, identity files or customer data.
-- Do not add a package publishing step. Publishing requires separate operator approval.
+- Publishing requires separate operator approval. Keep `publish.yml` manually dispatched; ordinary CI checks, pushes, tags, and pull requests must never publish packages.
 
 Do not report security vulnerabilities in a public issue. Follow [SECURITY.md](SECURITY.md) instead.

@@ -2,12 +2,12 @@
 
 The official JustDeploy SDK for server-side Node.js 22 and 24. The package includes ESM, CommonJS, and TypeScript declarations.
 
-> SDK authentication is currently enabled only for deployed projects in the Development Playground. Local SDK Credential exchange and deployed Production SDK calls remain disabled until the separate Production rollout.
+> These examples target SDK 0.1.1. Check the repository README and your JustDeploy guide for publication and authentication availability. During the Development preview, integration tests run in deployed Playground projects; local Credential exchange requires the Production rollout.
 
 ## Install
 
 ```bash
-npm install @justdeploy/sdk@0.1.0
+npm install @justdeploy/sdk@0.1.1
 ```
 
 ## Client
@@ -28,7 +28,7 @@ const { JustDeploy } = require('@justdeploy/sdk');
 const justdeploy = new JustDeploy();
 ```
 
-After the Production rollout, local development sets both `JUSTDEPLOY_ACCESS_KEY` and `JUSTDEPLOY_SECRET_KEY` in the process environment, while a deployed JustDeploy application needs no SDK configuration. Today, only the no-configuration path of a project deployed in the Development Playground is enabled. If a deployed application explicitly keeps both variables, the SDK accepts and prioritizes them; build feedback will recommend the simpler automatic deployment identity without blocking the build.
+After the Production rollout, local development sets both `JUSTDEPLOY_ACCESS_KEY` and `JUSTDEPLOY_SECRET_KEY` in the process environment, while a deployed JustDeploy application needs no SDK configuration. Before that rollout, use a project deployed in the Development Playground. If a deployed application explicitly keeps both variables, the SDK accepts and prioritizes them; build feedback recommends the simpler automatic deployment identity without blocking the build.
 
 ## Database
 
@@ -48,6 +48,8 @@ await justdeploy.databases.deleteTable(databaseId, 'orders');
 ```
 
 `query` accepts only the data statements allowed by the JustDeploy API. Use the table methods for schema changes.
+
+Prepare schema once before starting the application. A read returns `{ rows }`; a write returns `{ id }`, not `affectedRows`. The SQL argument is a string, not a parameter array; follow your `DATABASE.md` for safe text values.
 
 ## Storage
 
@@ -74,6 +76,10 @@ await justdeploy.storages.deleteFile(storageId, file.id);
 `upload` accepts a string, `Blob`, byte array, web stream, or async byte iterable. Upload and download bytes stream directly to the signed Storage URL without a JustDeploy authentication header.
 For a web stream or async iterable, also pass the exact byte length as `size`; sized values such as strings, blobs, and byte arrays are measured automatically.
 If a download races with a still-finishing upload, retry after the SDK's clear pending-upload error.
+
+Upload results have no signed URL. In 0.1.1, `file.size` is the number of bytes successfully transferred; 0.1.0 returns the initial `0`. Recorded metadata may remain `pending` briefly: use `getFile` after it becomes `active` for the final server record. Save the file ID, not the expiring URL. When redirecting a browser, use `(await justdeploy.storages.getFile(storageId, fileId)).url` without buffering the download.
+
+For pagination, pass `page.nextCursor` as the next call's `cursor` until it is null.
 
 ## Mail
 

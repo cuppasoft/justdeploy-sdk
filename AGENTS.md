@@ -16,6 +16,7 @@ This repository contains the public Node.js and Python SDKs for JustDeploy.
 - Never include secrets, SQL text or file contents in logs, errors or telemetry.
 - Authentication headers may be sent only to the configured JustDeploy API origin, never to other hosts or presigned upload URLs.
 - Do not publish npm or PyPI packages without explicit approval.
+- Publishing uses the manually dispatched `publish.yml` workflow and Trusted Publishing. Never add push/tag/release triggers, stored registry tokens, or Production server deployment to it.
 
 ## Working rules
 

@@ -148,7 +148,9 @@ export class Storages {
       throw new JustDeployError(`The file upload failed with status ${uploaded.status}.`, { status: uploaded.status });
     }
     await uploaded.body?.cancel().catch(() => undefined);
-    return withoutUrl(file);
+    // The creation record still has size=0 until the upload event is processed.
+    // A successful PUT already confirms this exact byte length; no extra read is needed.
+    return { ...withoutUrl(file), size };
   }
 
   async download(storageId: string, fileId: string, options: RequestOptions = {}): Promise<FileDownload> {

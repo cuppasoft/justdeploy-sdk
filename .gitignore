@@ -12,6 +12,7 @@ dist/
 *.tgz
 coverage/
 *.tsbuildinfo
+/release/
 
 # Python
 __pycache__/

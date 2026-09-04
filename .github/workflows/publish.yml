@@ -1,0 +1,133 @@
+name: Publish SDK
+run-name: SDK ${{ inputs.version }} (${{ inputs.publish && 'publish' || 'prepare only' }})
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Approved SDK version, matching both packages
+        required: true
+        type: string
+      publish:
+        description: Publish after checks (requires explicit operator approval)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sdk-publication
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    if: github.repository == 'cuppasoft/justdeploy-sdk' && github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/ci.yml
+
+  package:
+    needs: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      RELEASE_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+      - name: Validate the requested version
+        run: node scripts/check-release.mjs version
+      - name: Build npm archive
+        working-directory: javascript
+        run: |
+          npm ci --ignore-scripts
+          npm run build
+          mkdir -p ../release/npm
+          npm pack --pack-destination ../release/npm
+      - name: Build Python archives
+        working-directory: python
+        run: |
+          python -m pip install uv==0.12.6
+          uv build --out-dir ../release/pypi
+          uvx --from twine==7.0.0 twine check --strict ../release/pypi/*
+      - name: Check archive contents and record checksums
+        run: node scripts/check-release.mjs prepare
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: sdk-${{ inputs.version }}
+          path: release/
+          if-no-files-found: error
+          retention-days: 30
+
+  npm:
+    if: inputs.publish
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      RELEASE_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: sdk-${{ inputs.version }}
+          path: release
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Use an npm CLI with Trusted Publishing support
+        run: npm install --global npm@11.12.1 --ignore-scripts
+      - name: Verify and publish the tested archive
+        working-directory: release
+        run: |
+          sha256sum --check SHA256SUMS
+          npm publish "./npm/justdeploy-sdk-${RELEASE_VERSION}.tgz" --access public --tag latest --provenance
+
+  pypi:
+    if: inputs.publish
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: sdk-${{ inputs.version }}
+          path: release
+      - name: Verify the tested archives
+        working-directory: release
+        run: sha256sum --check SHA256SUMS
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
+        with:
+          packages-dir: release/pypi/
+          skip-existing: true
+
+  verify:
+    needs: [npm, pypi]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      RELEASE_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: sdk-${{ inputs.version }}
+          path: release
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Verify anonymous registry downloads against the tested archives
+        run: node scripts/check-release.mjs verify

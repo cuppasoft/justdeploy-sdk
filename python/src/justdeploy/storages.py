@@ -1,4 +1,5 @@
 import asyncio
+import builtins
 from contextlib import suppress
 from typing import cast
 
@@ -81,8 +82,9 @@ class Storages:
     def __init__(self, transport: SyncTransport) -> None:
         self._transport = transport
 
-    def list(self) -> list[Storage]:
-        result = cast(dict[str, list[Storage]], self._transport.organization_request("GET", "/storages"))
+    # Keep the built-in type distinct from this method during annotation inspection.
+    def list(self) -> builtins.list[Storage]:
+        result = cast(dict[str, builtins.list[Storage]], self._transport.organization_request("GET", "/storages"))
         return result["storages"]
 
     def list_files(self, storage_id: str, *, limit: int | None = None, cursor: int | None = None) -> FilePage:
@@ -113,7 +115,7 @@ class Storages:
         # the pending file record so an invalid stream cannot leave an orphaned row.
         content_length = _upload_size(data, size)
         result = cast(
-            dict[str, list[FileInfo]],
+            dict[str, builtins.list[FileInfo]],
             self._transport.organization_request(
                 "POST",
                 f"/storages/{path_segment(storage_id, 'storage_id')}/files",
@@ -135,7 +137,8 @@ class Storages:
                 response.close()
             raise JustDeployError(f"The file upload failed with status {response.status_code}.", status=response.status_code)
         response.close()
-        return _without_url(file)
+        # The creation record's size is still zero until the upload event arrives.
+        return {**_without_url(file), "size": content_length}
 
     def download(self, storage_id: str, file_id: str) -> FileDownload:
         file = self.get_file(storage_id, file_id)
@@ -163,8 +166,8 @@ class AsyncStorages:
     def __init__(self, transport: AsyncTransport) -> None:
         self._transport = transport
 
-    async def list(self) -> list[Storage]:
-        result = cast(dict[str, list[Storage]], await self._transport.organization_request("GET", "/storages"))
+    async def list(self) -> builtins.list[Storage]:
+        result = cast(dict[str, builtins.list[Storage]], await self._transport.organization_request("GET", "/storages"))
         return result["storages"]
 
     async def list_files(self, storage_id: str, *, limit: int | None = None, cursor: int | None = None) -> FilePage:
@@ -193,7 +196,7 @@ class AsyncStorages:
             raise JustDeployValidationError("upload mime must be a non-empty string.")
         content_length = _upload_size(data, size)
         result = cast(
-            dict[str, list[FileInfo]],
+            dict[str, builtins.list[FileInfo]],
             await self._transport.organization_request(
                 "POST",
                 f"/storages/{path_segment(storage_id, 'storage_id')}/files",
@@ -220,7 +223,7 @@ class AsyncStorages:
                     await response.aclose()
             raise JustDeployError(f"The file upload failed with status {response.status_code}.", status=response.status_code)
         await response.aclose()
-        return _without_url(file)
+        return {**_without_url(file), "size": content_length}
 
     async def download(self, storage_id: str, file_id: str) -> AsyncFileDownload:
         file = await self.get_file(storage_id, file_id)

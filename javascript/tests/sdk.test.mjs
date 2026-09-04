@@ -68,7 +68,7 @@ test('credential exchange has priority and supplies the API session header', asy
   assert.equal(calls[0].init.body, '{}');
   assert.equal(calls[1].url, `${API}/organizations/${ORG}/databases`);
   assert.equal(header(calls[1].init, 'authorization'), 'Bearer session-token');
-  assert.match(header(calls[1].init, 'x-justdeploy-sdk'), /^javascript\/0\.1\.0$/);
+  assert.equal(header(calls[1].init, 'x-justdeploy-sdk'), 'javascript/0.1.1');
 });
 
 test('partial or empty local credentials fail and never fall back to identity', async () => {
@@ -271,7 +271,7 @@ test('presigned upload and download never receive JustDeploy authentication head
     const url = String(input);
     calls.push({ url, init });
     if (url.includes('/auth/')) return session();
-    if (url.endsWith('/files') && init.method === 'POST') return json({ files: [{ ...file, status: 'pending', url: uploadUrl }] }, 201);
+    if (url.endsWith('/files') && init.method === 'POST') return json({ files: [{ ...file, size: 0, status: 'pending', url: uploadUrl }] }, 201);
     if (url === uploadUrl) return new Response(null, { status: 200 });
     if (url.endsWith('/files/file-id')) return json({ file: { ...file, url: downloadUrl } });
     if (url === downloadUrl) return new Response('hello', { status: 200, headers: { 'content-type': 'text/plain', 'content-length': '5' } });
@@ -281,6 +281,8 @@ test('presigned upload and download never receive JustDeploy authentication head
 
   const uploaded = await storages.upload('storage-id', { name: 'hello.txt', mime: 'text/plain', data: new TextEncoder().encode('hello') });
   assert.equal('url' in uploaded, false);
+  assert.equal(uploaded.size, 5);
+  assert.equal(uploaded.status, 'pending');
   const downloaded = await storages.download('storage-id', 'file-id');
   assert.equal(await new Response(downloaded.stream).text(), 'hello');
   assert.equal(downloaded.contentLength, 5);
@@ -373,7 +375,8 @@ test('stream upload requires and forwards an exact byte size before creating a f
   assert.equal(calls.length, 0);
 
   const stream = new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode('hello')); controller.close(); } });
-  await storages.upload('storage-id', { name: 'hello.txt', mime: 'text/plain', data: stream, size: 5 });
+  const uploaded = await storages.upload('storage-id', { name: 'hello.txt', mime: 'text/plain', data: stream, size: 5 });
+  assert.equal(uploaded.size, 5);
   assert.equal(calls.length, 3);
 });
 

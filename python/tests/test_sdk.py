@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import inspect
 import json
 import os
 import time
@@ -9,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from pathlib import Path
 from threading import Lock
-from typing import Any
+from typing import Any, get_type_hints
 
 import httpx
 import pytest
@@ -63,6 +64,15 @@ def test_public_clients_construct_without_network_io() -> None:
         assert client.mail
 
 
+@pytest.mark.parametrize("resource", [Databases, AsyncDatabases, Storages, AsyncStorages, MailClient, AsyncMailClient])
+def test_public_resource_annotations_can_be_inspected(resource: type[Any]) -> None:
+    for name, method in inspect.getmembers(resource, inspect.isfunction):
+        if name.startswith("_"):
+            continue
+        assert inspect.signature(method).return_annotation is not inspect.Signature.empty
+        assert "return" in get_type_hints(method)
+
+
 async def test_public_async_client_constructs_without_network_io() -> None:
     async with AsyncJustDeploy() as client:
         assert client.databases
@@ -87,7 +97,7 @@ def test_credential_exchange_and_data_session_headers() -> None:
     assert json.loads(requests[0].content) == {}
     assert str(requests[1].url) == f"{API}/organizations/{ORG}/databases"
     assert requests[1].headers["authorization"] == "Bearer session-token"
-    assert requests[1].headers["x-justdeploy-sdk"] == "python/0.1.0"
+    assert requests[1].headers["x-justdeploy-sdk"] == "python/0.1.1"
 
 
 @pytest.mark.parametrize(
@@ -368,7 +378,7 @@ def test_presigned_transfers_never_receive_justdeploy_authentication() -> None:
         if request.url.path == "/auth/credential":
             return session()
         if request.url.path.endswith("/files") and request.method == "POST":
-            return response({"files": [{**file, "status": "pending", "url": upload_url}]}, 201)
+            return response({"files": [{**file, "size": 0, "status": "pending", "url": upload_url}]}, 201)
         if url == upload_url:
             assert request.headers["content-length"] == "5"
             return httpx.Response(200)
@@ -384,6 +394,8 @@ def test_presigned_transfers_never_receive_justdeploy_authentication() -> None:
     with client:
         uploaded = storages.upload("storage-id", name="hello.txt", mime="text/plain", data=b"hello")
         assert "url" not in uploaded
+        assert uploaded["size"] == 5
+        assert uploaded["status"] == "pending"
         with storages.download("storage-id", "file-id") as downloaded:
             assert b"".join(downloaded.iter_bytes()) == b"hello"
             assert downloaded.content_length == 5
@@ -422,7 +434,7 @@ async def test_async_presigned_transfers_are_streamed_without_authentication() -
         if request.url.path == "/auth/credential":
             return session()
         if request.url.path.endswith("/files") and request.method == "POST":
-            return response({"files": [{**file, "status": "pending", "url": upload_url}]}, 201)
+            return response({"files": [{**file, "size": 0, "status": "pending", "url": upload_url}]}, 201)
         if url == upload_url:
             assert request.headers["content-length"] == "5"
             assert await request.aread() == b"hello"
@@ -439,6 +451,8 @@ async def test_async_presigned_transfers_are_streamed_without_authentication() -
     async with client:
         uploaded = await storages.upload("storage-id", name="hello.txt", mime="text/plain", data=chunks(), size=5)
         assert "url" not in uploaded
+        assert uploaded["size"] == 5
+        assert uploaded["status"] == "pending"
         async with await storages.download("storage-id", "file-id") as downloaded:
             assert b"".join([chunk async for chunk in downloaded.aiter_bytes()]) == b"hello"
 

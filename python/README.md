@@ -2,12 +2,12 @@
 
 The official JustDeploy SDK for server-side CPython 3.12, 3.13, and 3.14. Import it as `justdeploy`.
 
-> SDK authentication is currently enabled only for deployed projects in the Development Playground. Local SDK Credential exchange and deployed Production SDK calls remain disabled until the separate Production rollout.
+> These examples target SDK 0.1.1. Check the repository README and your JustDeploy guide for publication and authentication availability. During the Development preview, integration tests run in deployed Playground projects; local Credential exchange requires the Production rollout.
 
 ## Install
 
 ```bash
-python -m pip install justdeploy-sdk==0.1.0
+python -m pip install justdeploy-sdk==0.1.1
 ```
 
 ## Client
@@ -26,13 +26,17 @@ Async applications use the matching API:
 ```python
 from justdeploy import AsyncJustDeploy
 
-async with AsyncJustDeploy() as justdeploy:
-    result = await justdeploy.databases.query("your-database-id", "SELECT * FROM orders")
+
+async def read_orders() -> None:
+    async with AsyncJustDeploy() as justdeploy:
+        result = await justdeploy.databases.query("your-database-id", "SELECT * FROM orders")
 ```
 
-After the Production rollout, local development sets both `JUSTDEPLOY_ACCESS_KEY` and `JUSTDEPLOY_SECRET_KEY` in the process environment, while a deployed JustDeploy application needs no SDK configuration. Today, only the no-configuration path of a project deployed in the Development Playground is enabled. If a deployed application explicitly keeps both variables, the SDK accepts and prioritizes them; build feedback will recommend the simpler automatic deployment identity without blocking the build.
+After the Production rollout, local development sets both `JUSTDEPLOY_ACCESS_KEY` and `JUSTDEPLOY_SECRET_KEY` in the process environment, while a deployed JustDeploy application needs no SDK configuration. Before that rollout, use a project deployed in the Development Playground. If a deployed application explicitly keeps both variables, the SDK accepts and prioritizes them; build feedback recommends the simpler automatic deployment identity without blocking the build.
 
 ## Database
+
+The examples below run inside an open `with JustDeploy() as justdeploy:` block, using your existing resource IDs. Prepare schema once before starting the application, not on each startup.
 
 ```python
 databases = justdeploy.databases.list()
@@ -58,6 +62,8 @@ justdeploy.databases.delete_table(database_id, "orders")
 
 `query` accepts only the data statements allowed by the JustDeploy API. Use the table methods for schema changes. Add `await` to each call when using `AsyncJustDeploy`.
 
+A read returns `{"rows": [...]}`; a write returns `{"id": ...}`, not `affectedRows`. The SQL argument is a string, not a parameter array; follow your `DATABASE.md` for safe text values.
+
 ## Storage
 
 ```python
@@ -80,9 +86,23 @@ with justdeploy.storages.download(storage_id, file["id"]) as download:
 justdeploy.storages.delete_file(storage_id, file["id"])
 ```
 
-The async download uses `async with` and `async for chunk in download.aiter_bytes()`. Upload and download bytes stream directly to the signed Storage URL without a JustDeploy authentication header.
+The async download must be awaited before entering its context:
+
+```python
+async def stream_file(storage_id: str, file_id: str) -> None:
+    async with AsyncJustDeploy() as justdeploy:
+        async with await justdeploy.storages.download(storage_id, file_id) as download:
+            async for chunk in download.aiter_bytes():
+                pass
+```
+
+Upload and download bytes stream directly to the signed Storage URL without a JustDeploy authentication header.
 When upload data is an iterator or async iterator, pass its exact byte length as `size`. Byte strings and seekable binary files are measured automatically.
 If a download races with a still-finishing upload, retry after the SDK's clear pending-upload error.
+
+Upload results have no signed URL. In 0.1.1, `file["size"]` is the number of bytes successfully transferred; 0.1.0 returns the initial `0`. Recorded metadata may remain `pending` briefly: use `get_file` after it becomes `active` for the final server record. Save the file ID, not the expiring URL.
+
+Returned JSON keys stay camelCase in Python. For pagination, pass `page["nextCursor"]` as the next call's `cursor` until it is null; there is no `next_cursor` response key.
 
 ## Mail
 

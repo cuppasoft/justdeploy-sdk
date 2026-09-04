@@ -6,6 +6,8 @@ Official server-side SDKs for [JustDeploy](https://justdeploy.ai).
 >
 > SDK authentication is currently enabled only for deployed projects in the Development Playground. A local client with Credential environment variables connects to Production, and Production SDK authentication is not enabled yet. Both paths will be announced only after the separate Production rollout.
 
+This checkout prepares **0.1.1 (publication approved, not published yet)**: Python 3.14 method inspection works, and successful uploads report the transferred byte size immediately. The language READMEs describe that candidate and pin 0.1.1 for package review. The public installation commands and runnable examples below stay on 0.1.0 until publication is verified.
+
 ## Supported runtimes
 
 | Language              | Runtime                     | Package                                    |
@@ -105,18 +107,25 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) before changing both language surfaces, a
 
 ## Publishing (operator only)
 
-Publishing requires explicit approval and the [release checklist](docs/release-checklist.md). There is no automated publishing workflow. Publish only the exact archives already reviewed; replace `<version>` below with a new version, never an existing release.
+Publishing requires explicit approval and the [release checklist](docs/release-checklist.md). Use the manually dispatched [Publish SDK workflow](https://github.com/cuppasoft/justdeploy-sdk/actions/workflows/publish.yml) on `main`. A push, tag, pull request, or GitHub release never publishes a package. This workflow does not deploy the JustDeploy server.
+
+The one-time registry setup authorizes only `cuppasoft/justdeploy-sdk` → `publish.yml` as a Trusted Publisher, with no GitHub environment name. On npm, allow direct `npm publish`, not just staged publishing. Keep account two-factor authentication enabled. Do not add `NPM_TOKEN`, `PYPI_API_TOKEN`, or registry login commands to GitHub Actions.
+
+After updating both package versions and committing the reviewed source:
 
 ```bash
-# From javascript/, after building and reviewing npm pack output:
-npm publish "./justdeploy-sdk-<version>.tgz" --access public --tag latest --provenance=false
+# Test and build only; this is also the workflow's default.
+gh workflow run publish.yml --repo cuppasoft/justdeploy-sdk --ref main \
+  -f version=<version> -F publish=false
 
-# From python/, after building and reviewing uv build output:
-uvx twine check --strict "dist/justdeploy_sdk-<version>-py3-none-any.whl" "dist/justdeploy_sdk-<version>.tar.gz"
-uvx twine upload --repository-url https://upload.pypi.org/legacy/ "dist/justdeploy_sdk-<version>-py3-none-any.whl" "dist/justdeploy_sdk-<version>.tar.gz"
+# Only after publication approval, with the same reviewed main commit:
+gh workflow run publish.yml --repo cuppasoft/justdeploy-sdk --ref main \
+  -f version=<version> -F publish=true
 ```
 
-Complete npm's browser authentication when prompted. Enter the PyPI token only at the hidden terminal prompt, not in the command, chat, or repository.
+The workflow checks all five supported runtimes, validates versions and package contents, and keeps the three archives plus their SHA-256 checksums as a release artifact. The publishing jobs use those exact archives and authenticate through GitHub; no registry token or routine browser confirmation is needed. A final check downloads all three public files without authentication and compares their checksums.
+
+After a partial failure, inspect what is already public and rerun only the failed jobs. Do not overwrite an existing version or restart a successful npm publish. After both registries pass verification, clean-install by public package name, then update this README, example pins, and Development guides together.
 
 ## License
 
