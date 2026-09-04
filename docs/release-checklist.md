@@ -1,6 +1,6 @@
 # SDK release checklist
 
-Stable `0.1.0` was published to npm and PyPI on 2026-09-04 after explicit operator approval. Publishing and Production rollout are separate approval gates.
+Stable `0.1.1` was published to npm and PyPI on 2026-09-04 through the approved [GitHub publishing run](https://github.com/cuppasoft/justdeploy-sdk/actions/runs/33831514520). Publishing and Production rollout are separate approval gates.
 
 ## Development Playground server readiness
 
@@ -24,7 +24,7 @@ Stable `0.1.0` was published to npm and PyPI on 2026-09-04 after explicit operat
 - [x] Install `0.1.0` from npm by package name in clean Node.js 22 and 24 environments and import both ESM and CommonJS exports.
 - [x] Install only from the public registries and verify that a clean Playground project can follow each guide without repository-only knowledge: Node web, Python sync API, and Python async cron, each in two fresh-agent rounds.
 
-## 0.1.1 patch candidate
+## 0.1.1 release
 
 - [x] Both language versions are 0.1.1; successful uploads return their transferred byte size without an extra API call.
 - [x] Python 3.14 can inspect all public resource-list method annotations.
@@ -33,15 +33,16 @@ Stable `0.1.0` was published to npm and PyPI on 2026-09-04 after explicit operat
 - [x] Verify the real Development API/Console guides and fresh build analysis; normal SDK construction no longer produces a manual-Credential requirement.
 - [x] Review npm/wheel/sdist license, types, file lists, and absence of credentials and identity files.
 - [x] Obtain explicit 0.1.1 publication approval. This is separate from Production deployment approval.
-- [ ] Publish the reviewed archives, anonymously verify their hashes, then clean-install by public package name.
-- [ ] Update the repository release notice, example dependency pins, and live Development guide pins together. Public guides remain on available 0.1.0 until then.
+- [x] Publish the reviewed archives, anonymously verify all three hashes, then clean-install by public package name: 15 tests each on Node.js 22/24 and 28 each on Python 3.12/3.13/3.14, 114 in total.
+- [x] Update the repository release notice, example dependency pins, and Development API/Console guide images to the verified public 0.1.1 together. Verify deployed image contents and all seven API guide responses.
+- [ ] Recheck the seven Console guide responses from an allowed network. The new image is deployed and verified, but the current network receives the existing IP-allowlist 403; the allowlist was not changed.
 
 ## GitHub publishing setup
 
 - [x] Register the PyPI `justdeploy-sdk` Trusted Publisher for `cuppasoft/justdeploy-sdk`, workflow `publish.yml`, no environment name.
 - [x] Register the same publisher for npm `@justdeploy/sdk`, including permission for direct `npm publish`.
-- [ ] Commit the manual-only workflow and pass its prepare-only run on the reviewed `main` commit.
-- [ ] Publish through GitHub without stored registry tokens and verify anonymous archive downloads.
+- [x] Commit the manual-only workflow, pass a prepare-only run, and verify the publishing artifacts against the Development-tested files. Later CI-only changes leave SDK source and archive contents unchanged.
+- [x] Publish through GitHub without stored registry tokens and verify anonymous archive downloads.
 
 Account GitHub linking is not publishing authorization. These registry settings are a one-time setup; normal approved releases use the manual GitHub workflow. Keep account two-factor authentication enabled and never add push/tag/release publishing triggers.
 
@@ -64,4 +65,4 @@ Account GitHub linking is not publishing authorization. These registry settings 
 - [ ] Immediately test an identity-free local client with only the two Credential environment variables. This exact path cannot target the Development API because the SDK intentionally has no API URL setting.
 - [ ] Only after that local check passes, redeploy every existing Production application and clean exactly identified legacy temporary build archives. For source-less applications already using current identity images, reapply the same image and verify a new execution revision; do not claim their missing source was rebuilt or recovered.
 
-Production authentication can roll out with the already-public 0.1.0. Publishing the optional 0.1.1 fixes remains a separate approval and never happens implicitly during server deployment.
+Publishing 0.1.1 does not enable Production authentication. The server rollout remains a separate explicit approval.

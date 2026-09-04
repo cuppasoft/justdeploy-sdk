@@ -2,11 +2,11 @@
 
 Official server-side SDKs for [JustDeploy](https://justdeploy.ai).
 
-> Version `0.1.0` was published to [npm](https://www.npmjs.com/package/@justdeploy/sdk) and [PyPI](https://pypi.org/project/justdeploy-sdk/0.1.0/) on 2026-09-04. Package availability and Production authentication rollout are separate milestones.
+> Version `0.1.1` was published to [npm](https://www.npmjs.com/package/@justdeploy/sdk/v/0.1.1) and [PyPI](https://pypi.org/project/justdeploy-sdk/0.1.1/) on 2026-09-04 through GitHub Trusted Publishing. Package availability and Production authentication rollout are separate milestones.
 >
 > SDK authentication is currently enabled only for deployed projects in the Development Playground. A local client with Credential environment variables connects to Production, and Production SDK authentication is not enabled yet. Both paths will be announced only after the separate Production rollout.
 
-This checkout prepares **0.1.1 (publication approved, not published yet)**: Python 3.14 method inspection works, and successful uploads report the transferred byte size immediately. The language READMEs describe that candidate and pin 0.1.1 for package review. The public installation commands and runnable examples below stay on 0.1.0 until publication is verified.
+Version `0.1.1` fixes Python 3.14 method inspection and reports the transferred byte size immediately after a successful upload.
 
 ## Supported runtimes
 
@@ -20,16 +20,16 @@ Both packages cover Database, Storage, and Mail. They are for server application
 ## Install
 
 ```bash
-npm install @justdeploy/sdk@0.1.0
+npm install @justdeploy/sdk@0.1.1
 ```
 
 ```bash
-python -m pip install justdeploy-sdk==0.1.0
+python -m pip install justdeploy-sdk==0.1.1
 ```
 
 ## Quick start (after Production rollout)
 
-The examples below are the stable `0.1.0` contract. They are not a usable local setup until the Production authentication rollout is announced; today, only an application deployed in the Development Playground can exercise the automatic identity path.
+The examples below use `0.1.1`. They are not a usable local setup until the Production authentication rollout is announced; today, only an application deployed in the Development Playground can exercise the automatic identity path.
 
 After that rollout, local development uses a Credential from the JustDeploy console:
 
@@ -83,7 +83,7 @@ JavaScript and TypeScript:
 
 ```bash
 cd javascript
-npm ci
+npm ci --no-audit
 npm audit --audit-level=high
 npm run typecheck
 npm test

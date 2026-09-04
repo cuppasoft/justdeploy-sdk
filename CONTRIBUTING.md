@@ -6,7 +6,7 @@ Run the complete checks before submitting a change:
 
 ```bash
 cd javascript
-npm ci
+npm ci --no-audit
 npm audit --audit-level=high
 npm run typecheck
 npm test
