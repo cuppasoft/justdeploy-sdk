@@ -31,8 +31,16 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
           cache-dependency-path: javascript/package-lock.json
+      - name: Use the tested publishing CLI
+        run: npm install --global npm@11.12.1 --ignore-scripts --no-audit
       - run: npm ci --no-audit
-      - run: npm audit --audit-level=high
+      - name: Audit dependencies with bounded retries
+        run: |
+          for attempt in 1 2 3; do
+            if npm audit --audit-level=high; then exit 0; fi
+            if [ "$attempt" -lt 3 ]; then sleep 10; fi
+          done
+          exit 1
       - run: npm run typecheck
       - run: npm test
       - run: node --check ../examples/javascript/database.mjs && node --check ../examples/javascript/mail.cjs
