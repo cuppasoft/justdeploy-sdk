@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-No SDK version has been published yet. Supported versions will be listed here with the first release.
+Security fixes target the latest published version, currently `0.1.1`. Upgrade older versions before reporting a problem that the latest release already fixes.
 
 ## Reporting a vulnerability
 

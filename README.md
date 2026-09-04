@@ -2,11 +2,9 @@
 
 Official server-side SDKs for [JustDeploy](https://justdeploy.ai).
 
-> Version `0.1.1` was published to [npm](https://www.npmjs.com/package/@justdeploy/sdk/v/0.1.1) and [PyPI](https://pypi.org/project/justdeploy-sdk/0.1.1/) on 2026-09-04 through GitHub Trusted Publishing. Package availability and Production authentication rollout are separate milestones.
+> Version `0.1.1` is available on [npm](https://www.npmjs.com/package/@justdeploy/sdk/v/0.1.1) and [PyPI](https://pypi.org/project/justdeploy-sdk/0.1.1/).
 >
-> Production SDK authentication is enabled as of 2026-09-04. Local applications use Credential environment variables; deployed web, API, and cron applications can use automatic identity. Development remains limited to Playground.
-
-Version `0.1.1` fixes Python 3.14 method inspection and reports the transferred byte size immediately after a successful upload.
+> Production supports SDK authentication. Local applications use Credential environment variables; deployed web, API, and cron applications can use automatic identity. Development remains limited to Playground.
 
 ## Supported runtimes
 
@@ -113,7 +111,7 @@ uv run pip-audit
 uv build
 ```
 
-The [CI workflow](.github/workflows/ci.yml) audits the shared JavaScript dependency lockfile once, on Node.js 24. That step allows 120 seconds per npm request and at most three audit attempts, with 10 seconds between attempts; other npm steps retain their 30-second request timeout. A high-severity finding or unavailable audit still fails CI and blocks publishing. An audit connection timeout is not a clean security result and does not require registry login. Recorded results are in the [release checklist](docs/release-checklist.md).
+The [CI workflow](.github/workflows/ci.yml) audits the shared JavaScript dependency lockfile once, on Node.js 24. That step allows 120 seconds per npm request and at most three audit attempts, with 10 seconds between attempts; other npm steps retain their 30-second request timeout. A high-severity finding or unavailable audit still fails CI and blocks publishing. An audit connection timeout is not a clean security result and does not require registry login. Release gates are in the [release checklist](docs/release-checklist.md).
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) before changing both language surfaces, and report security issues through [SECURITY.md](SECURITY.md).
 

@@ -6,7 +6,7 @@ This repository contains the public Node.js and Python SDKs for JustDeploy.
 
 - Support Node.js and Python only. Keep both SDKs on the same version and feature set.
 - Support server applications only. Do not add Browser, Edge Runtime, Deno or Bun compatibility.
-- The first release covers Database, Storage and Mail. Do not add a generic raw-request API.
+- The SDK covers Database, Storage and Mail. Do not add a generic raw-request API.
 - Do not add a JustDeploy CLI.
 - Keep public APIs small and explicit so an AI can select the correct operation without guessing.
 
@@ -22,6 +22,6 @@ This repository contains the public Node.js and Python SDKs for JustDeploy.
 
 - Keep language behavior and documentation equivalent.
 - Add or update tests with implementation changes.
-- Record setup, test and release commands in the root README once they exist.
+- Keep setup, test and release commands in the root README; link to them instead of duplicating them.
 - Use Conventional Commit prefixes such as `feat:`, `fix:`, `docs:`, `refactor:` and `chore:`.
 - Keep generated files, build output and local secrets out of Git.

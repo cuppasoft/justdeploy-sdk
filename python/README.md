@@ -100,7 +100,7 @@ Upload and download bytes stream directly to the signed Storage URL without a Ju
 When upload data is an iterator or async iterator, pass its exact byte length as `size`. Byte strings and seekable binary files are measured automatically.
 If a download races with a still-finishing upload, retry after the SDK's clear pending-upload error.
 
-Upload results have no signed URL. In 0.1.1, `file["size"]` is the number of bytes successfully transferred; 0.1.0 returns the initial `0`. Recorded metadata may remain `pending` briefly: use `get_file` after it becomes `active` for the final server record. Save the file ID, not the expiring URL.
+Upload results have no signed URL. `file["size"]` is the number of bytes successfully transferred. Recorded metadata may remain `pending` briefly: use `get_file` after it becomes `active` for the final server record. Save the file ID, not the expiring URL.
 
 Returned JSON keys stay camelCase in Python. For pagination, pass `page["nextCursor"]` as the next call's `cursor` until it is null; there is no `next_cursor` response key.
 
@@ -125,6 +125,6 @@ Use a stable, unique `idempotency_key` when a caller might retry a mail request 
 
 All SDK and API failures extend `JustDeployError`. API errors expose `status`, `retry_after`, `request_id`, and `details`. Request bodies, SQL, file content, and authentication values are not retained in SDK errors.
 
-Async calls use normal Python task cancellation. Cancel the task with `task.cancel()`; a canceled upload also tries to remove its pending file record. Sync calls and all API requests have a 30-second timeout.
+Async calls use normal Python task cancellation. Cancel the task with `task.cancel()`; a canceled upload also tries to remove its pending file record. Authentication exchanges have a 10-second timeout; ordinary JustDeploy API requests have a 30-second timeout.
 
 The SDK may refresh authentication and repeat one failed `GET` once. It never automatically repeats a mutation.

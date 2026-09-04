@@ -77,7 +77,7 @@ await justdeploy.storages.deleteFile(storageId, file.id);
 For a web stream or async iterable, also pass the exact byte length as `size`; sized values such as strings, blobs, and byte arrays are measured automatically.
 If a download races with a still-finishing upload, retry after the SDK's clear pending-upload error.
 
-Upload results have no signed URL. In 0.1.1, `file.size` is the number of bytes successfully transferred; 0.1.0 returns the initial `0`. Recorded metadata may remain `pending` briefly: use `getFile` after it becomes `active` for the final server record. Save the file ID, not the expiring URL. When redirecting a browser, use `(await justdeploy.storages.getFile(storageId, fileId)).url` without buffering the download.
+Upload results have no signed URL. `file.size` is the number of bytes successfully transferred. Recorded metadata may remain `pending` briefly: use `getFile` after it becomes `active` for the final server record. Save the file ID, not the expiring URL. When redirecting a browser, use `(await justdeploy.storages.getFile(storageId, fileId)).url` without buffering the download.
 
 For pagination, pass `page.nextCursor` as the next call's `cursor` until it is null.
 

@@ -2,25 +2,7 @@
 
 JustDeploy SDK maintains matching Node.js and Python releases. Please open an issue before starting a large change so both APIs can stay aligned.
 
-Run the complete checks before submitting a change:
-
-```bash
-cd javascript
-npm ci --no-audit
-npm audit --audit-level=high
-npm run typecheck
-npm test
-npm run pack:check
-
-cd ../python
-uv sync --all-groups --frozen
-uv run ruff format --check . ../examples/python
-uv run ruff check . ../examples/python
-uv run mypy src tests ../examples/python
-uv run pytest
-uv run pip-audit
-uv build
-```
+Run the checks in [Development](README.md#development) before submitting a change. The CI workflow covers every supported runtime.
 
 When submitting a pull request:
 
