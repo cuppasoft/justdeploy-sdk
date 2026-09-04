@@ -46,7 +46,7 @@ Stable `0.1.1` was published to npm and PyPI on 2026-09-04 through the approved 
 
 Account GitHub linking is not publishing authorization. These registry settings are a one-time setup; normal approved releases use the manual GitHub workflow. Keep account two-factor authentication enabled and never add push/tag/release publishing triggers.
 
-The subsequent documentation-only commit `8aea941` has a [failed CI run](https://github.com/cuppasoft/justdeploy-sdk/actions/runs/33832112037): npm's security-audit endpoint timed out on both attempts. Runtime sources and dependency lockfiles are unchanged from the successful publishing commit `726da7c`. This is not a vulnerability finding or a successful current audit; keep the security check enabled and recheck before Production rollout.
+The subsequent documentation-only commit `30a339e` also has a [failed CI run](https://github.com/cuppasoft/justdeploy-sdk/actions/runs/33832906811): npm's security-audit endpoint timed out on all three retries. Runtime sources and dependency lockfiles are unchanged from the successful publishing commit `726da7c`. This is not a vulnerability finding or a successful current audit; keep the security check enabled and recheck before Production rollout.
 
 ## Completed 0.1.0 publishing gate
 
@@ -62,9 +62,14 @@ The subsequent documentation-only commit `8aea941` has a [failed CI run](https:/
 - [x] Complete public-package Development Playground guide validation and record the remaining publication/Production gates.
 - [x] Prepare the server's Production-enabled release source and test both stage branches; Development remains limited to Playground. Deploy the same source to Development without touching live Production functions.
 - [x] Run the server's read-only Production preflight: both DDLs, six IAM policies, ten platform functions, fifteen current customer builds, original-source availability, and rollback archives. Repeat it immediately before rollout.
+- [ ] Pass the latest SDK CI, including the dependency security audit, without bypassing a failed or unavailable check.
 - [ ] Enable Production SDK permissions and guides only after separate explicit operator approval.
 - [ ] Include Storage's failed-upload cleanup and edge attachment in the coordinated server rollout; do not deploy only authentication and guides.
 - [ ] Immediately test an identity-free local client with only the two Credential environment variables. This exact path cannot target the Development API because the SDK intentionally has no API URL setting.
-- [ ] Only after that local check passes, redeploy every existing Production application and clean exactly identified legacy temporary build archives. For source-less applications already using current identity images, reapply the same image and verify a new execution revision; do not claim their missing source was rebuilt or recovered.
+- [ ] After that short local check passes, refresh every existing Production application in parallel within available capacity. Rebuild available sources; for source-less applications already using current identity images, reapply the same image and verify a new execution revision. Missing source is not rebuilt or recovered.
+- [ ] Check basic readiness and baseline responses for every application, then perform detailed post-rollout sampling: rebuilt web, API, and source-less web, including a custom domain. Preserve build health checks and automatic rollback.
+- [ ] Verify public 0.1.1 automatic authentication and Database, Storage, and Mail in operator-owned Node web and Python cron test applications. Customer rebuilds do not add SDK usage or cover Python/cron. Use only isolated test data and the designated test recipient; test Firewall rejection only on the test web application.
+- [ ] Check representative Production API/Console guides and actual Storage delivery. Restore failed applications, or the platform and affected applications for a shared failure, using the saved rollback artifacts before declaring completion.
+- [ ] After all checks pass, clean exactly identified legacy temporary build archives and resources created for this test. Preserve original source, rollback material, manual Credentials, and guide keys.
 
-Publishing 0.1.1 does not enable Production authentication. The server rollout remains a separate explicit approval.
+Publishing 0.1.1 does not enable Production authentication. The server rollout remains a separate explicit approval. The canonical target inventory, deployment order, stop conditions, and recovery procedure are in the server repository's `docs/proposals/sdk.md`; this checklist does not define a second rollout plan. Completed Development simulations and the 114 public-install checks need not be rerun in Production.
