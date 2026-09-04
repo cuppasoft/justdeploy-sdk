@@ -37,6 +37,9 @@ jobs:
       - name: Audit dependencies with bounded retries
         # Both runtimes use the same locked dependency versions; audit that tree once.
         if: matrix.node == 24
+        env:
+          # Advisory responses can exceed the default CI request timeout.
+          NPM_CONFIG_FETCH_TIMEOUT: "120000"
         run: |
           for attempt in 1 2 3; do
             if npm audit --audit-level=high; then exit 0; fi
