@@ -16,6 +16,10 @@ on:
 permissions:
   contents: read
 
+env:
+  NPM_CONFIG_FETCH_TIMEOUT: "30000"
+  NPM_CONFIG_FETCH_RETRIES: "2"
+
 concurrency:
   group: sdk-publication
   cancel-in-progress: false
@@ -46,7 +50,7 @@ jobs:
       - name: Build npm archive
         working-directory: javascript
         run: |
-          npm ci --ignore-scripts
+          npm ci --ignore-scripts --no-audit
           npm run build
           mkdir -p ../release/npm
           npm pack --pack-destination ../release/npm
@@ -84,7 +88,7 @@ jobs:
         with:
           node-version: 24
       - name: Use an npm CLI with Trusted Publishing support
-        run: npm install --global npm@11.12.1 --ignore-scripts
+        run: npm install --global npm@11.12.1 --ignore-scripts --no-audit
       - name: Verify and publish the tested archive
         working-directory: release
         run: |

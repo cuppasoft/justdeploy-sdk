@@ -39,7 +39,7 @@ Stable `0.1.0` was published to npm and PyPI on 2026-09-04 after explicit operat
 ## GitHub publishing setup
 
 - [x] Register the PyPI `justdeploy-sdk` Trusted Publisher for `cuppasoft/justdeploy-sdk`, workflow `publish.yml`, no environment name.
-- [ ] Register the same publisher for npm `@justdeploy/sdk`, including permission for direct `npm publish`.
+- [x] Register the same publisher for npm `@justdeploy/sdk`, including permission for direct `npm publish`.
 - [ ] Commit the manual-only workflow and pass its prepare-only run on the reviewed `main` commit.
 - [ ] Publish through GitHub without stored registry tokens and verify anonymous archive downloads.
 
