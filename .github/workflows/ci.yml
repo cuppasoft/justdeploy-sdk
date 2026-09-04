@@ -35,6 +35,8 @@ jobs:
         run: npm install --global npm@11.12.1 --ignore-scripts --no-audit
       - run: npm ci --no-audit
       - name: Audit dependencies with bounded retries
+        # Both runtimes use the same locked dependency versions; audit that tree once.
+        if: matrix.node == 24
         run: |
           for attempt in 1 2 3; do
             if npm audit --audit-level=high; then exit 0; fi
