@@ -1,1 +1,1 @@
-justdeploy-sdk==0.1.1
+justdeploy-sdk==0.2.0

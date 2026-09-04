@@ -2,11 +2,9 @@
 
 Official server-side SDKs for [JustDeploy](https://justdeploy.ai).
 
-> Version `0.1.1` is available on [npm](https://www.npmjs.com/package/@justdeploy/sdk/v/0.1.1) and [PyPI](https://pypi.org/project/justdeploy-sdk/0.1.1/).
+> Version `0.2.0` is available on [npm](https://www.npmjs.com/package/@justdeploy/sdk/v/0.2.0) and [PyPI](https://pypi.org/project/justdeploy-sdk/0.2.0/).
 >
 > Production supports SDK authentication. Local applications use Credential environment variables; deployed web, API, and cron applications can use automatic identity. Development remains limited to Playground.
-
-The working source and language guides target the **0.2.0 release candidate** with bound query values and browser-direct upload preparation. The install commands below still point to public 0.1.1 until registry verification finishes.
 
 ## Supported runtimes
 
@@ -20,16 +18,16 @@ Both packages cover Database, Storage, and Mail. They are for server application
 ## Install
 
 ```bash
-npm install @justdeploy/sdk@0.1.1
+npm install @justdeploy/sdk@0.2.0
 ```
 
 ```bash
-python -m pip install justdeploy-sdk==0.1.1
+python -m pip install justdeploy-sdk==0.2.0
 ```
 
 ## Quick start
 
-The examples below use `0.1.1`. For local development, use a Credential from the Production JustDeploy console and resource IDs from that same organization:
+For local development, use a Credential from the Production JustDeploy console and resource IDs from that same organization:
 
 ```bash
 export JUSTDEPLOY_ACCESS_KEY="<access-key>"
@@ -44,14 +42,16 @@ In a deployed JustDeploy application, use the same argument-free client without 
 import { JustDeploy } from '@justdeploy/sdk';
 
 const justdeploy = new JustDeploy();
-const result = await justdeploy.databases.query('your-database-id', 'SELECT * FROM orders');
+const result = await justdeploy.databases.query('your-database-id',
+  'SELECT * FROM orders WHERE customer = ?', { params: ['Ada'] });
 ```
 
 ```python
 from justdeploy import JustDeploy
 
 with JustDeploy() as justdeploy:
-    result = justdeploy.databases.query("your-database-id", "SELECT * FROM orders")
+    result = justdeploy.databases.query("your-database-id",
+        "SELECT * FROM orders WHERE customer = ?", params=["Ada"])
 ```
 
 See the language guides for the complete small API:

@@ -28,6 +28,6 @@ Use this checklist for each release. Commands and publishing setup are in [READM
 
 Production rollout is separately approved and tracked in the server repository's `docs/specs/ops.md`. Use its preflight, migration and recovery procedure; package publication is not evidence that the server rollout succeeded.
 
-The current baseline is SDK `0.1.1`, with Production authentication enabled for local Credentials and deployed web/API/cron identities. Development authentication remains limited to Playground.
+The current baseline is SDK `0.2.0`, with Production support for bound query values, browser-direct upload preparation, local Credentials and deployed web/API/cron identities. Development authentication remains limited to Playground. Server support and platform-owned Storage CORS must be in place before advertising these methods; do not roll back to a server that cannot support the published SDK.
 
 The operator confirmed receipt of an SDK-sent Production email. Production Mail idempotency and the server record's `delivered` status remain unverified; they are tracked in the server's `docs/proposals/misc-roadmap.md`. Any additional send requires separate approval. Production Database sampling was read-only, not a full CRUD/DDL test.

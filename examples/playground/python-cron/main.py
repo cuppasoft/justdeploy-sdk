@@ -39,31 +39,36 @@ def handler(_event: object, _context: object) -> dict[str, object]:
             table_created = True
             inserted = justdeploy.databases.query(
                 database_id,
-                f"INSERT INTO `{table_name}` (`label`, `value`) VALUES ('before', 1)",
+                f"INSERT INTO `{table_name}` (`label`, `value`) VALUES (?, ?)",
+                params=["before", 1],
             )
             row_id = inserted["id"]
             selected = justdeploy.databases.query(
                 database_id,
-                f"SELECT `label`, `value` FROM `{table_name}` WHERE `id` = {row_id}",
+                f"SELECT `label`, `value` FROM `{table_name}` WHERE `id` = ?",
+                params=[row_id],
             )
             if selected["rows"] != [{"label": "before", "value": 1}]:
-                raise RuntimeError(f"Unexpected inserted row: {selected['rows']!r}")
+                raise RuntimeError("Unexpected inserted row.")
 
             justdeploy.databases.query(
                 database_id,
-                f"UPDATE `{table_name}` SET `label` = 'after', `value` = 2 WHERE `id` = {row_id}",
+                f"UPDATE `{table_name}` SET `label` = ?, `value` = ? WHERE `id` = ?",
+                params=["after", 2, row_id],
             )
             updated = justdeploy.databases.query(
                 database_id,
-                f"SELECT `label`, `value` FROM `{table_name}` WHERE `id` = {row_id}",
+                f"SELECT `label`, `value` FROM `{table_name}` WHERE `id` = ?",
+                params=[row_id],
             )
             if updated["rows"] != [{"label": "after", "value": 2}]:
-                raise RuntimeError(f"Unexpected updated row: {updated['rows']!r}")
+                raise RuntimeError("Unexpected updated row.")
 
-            justdeploy.databases.query(database_id, f"DELETE FROM `{table_name}` WHERE `id` = {row_id}")
+            justdeploy.databases.query(database_id, f"DELETE FROM `{table_name}` WHERE `id` = ?", params=[row_id])
             deleted = justdeploy.databases.query(
                 database_id,
-                f"SELECT `id` FROM `{table_name}` WHERE `id` = {row_id}",
+                f"SELECT `id` FROM `{table_name}` WHERE `id` = ?",
+                params=[row_id],
             )
             if deleted["rows"]:
                 raise RuntimeError("The database row was not deleted.")
@@ -97,7 +102,7 @@ def handler(_event: object, _context: object) -> dict[str, object]:
                 raise RuntimeError("The same mail idempotency key created two messages.")
 
             result = {
-                "sdk": "python/0.1.1",
+                "sdk": "python/0.2.0",
                 "databaseDml": True,
                 "storageStreaming": True,
                 "mailIdempotency": True,

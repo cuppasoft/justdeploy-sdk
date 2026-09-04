@@ -32,31 +32,35 @@ exports.handler = async () => {
 
     const inserted = await justdeploy.databases.query(
       databaseId,
-      `INSERT INTO \`${tableName}\` (\`label\`, \`value\`) VALUES ('before', 1)`,
+      `INSERT INTO \`${tableName}\` (\`label\`, \`value\`) VALUES (?, ?)`,
+      { params: ['before', 1] },
     );
     const rowId = inserted.id;
     const selected = await justdeploy.databases.query(
       databaseId,
-      `SELECT \`label\`, \`value\` FROM \`${tableName}\` WHERE \`id\` = ${rowId}`,
+      `SELECT \`label\`, \`value\` FROM \`${tableName}\` WHERE \`id\` = ?`,
+      { params: [rowId] },
     );
     if (JSON.stringify(selected.rows) !== JSON.stringify([{ label: 'before', value: 1 }])) {
-      throw new Error(`Unexpected inserted row: ${JSON.stringify(selected.rows)}`);
+      throw new Error('Unexpected inserted row.');
     }
 
     await justdeploy.databases.query(
       databaseId,
-      `UPDATE \`${tableName}\` SET \`label\` = 'after', \`value\` = 2 WHERE \`id\` = ${rowId}`,
+      `UPDATE \`${tableName}\` SET \`label\` = ?, \`value\` = ? WHERE \`id\` = ?`,
+      { params: ['after', 2, rowId] },
     );
     const updated = await justdeploy.databases.query(
       databaseId,
-      `SELECT \`label\`, \`value\` FROM \`${tableName}\` WHERE \`id\` = ${rowId}`,
+      `SELECT \`label\`, \`value\` FROM \`${tableName}\` WHERE \`id\` = ?`,
+      { params: [rowId] },
     );
     if (JSON.stringify(updated.rows) !== JSON.stringify([{ label: 'after', value: 2 }])) {
-      throw new Error(`Unexpected updated row: ${JSON.stringify(updated.rows)}`);
+      throw new Error('Unexpected updated row.');
     }
 
-    await justdeploy.databases.query(databaseId, `DELETE FROM \`${tableName}\` WHERE \`id\` = ${rowId}`);
-    const deleted = await justdeploy.databases.query(databaseId, `SELECT \`id\` FROM \`${tableName}\` WHERE \`id\` = ${rowId}`);
+    await justdeploy.databases.query(databaseId, `DELETE FROM \`${tableName}\` WHERE \`id\` = ?`, { params: [rowId] });
+    const deleted = await justdeploy.databases.query(databaseId, `SELECT \`id\` FROM \`${tableName}\` WHERE \`id\` = ?`, { params: [rowId] });
     if (deleted.rows.length !== 0) throw new Error('The database row was not deleted.');
 
     const stream = new ReadableStream({
@@ -95,7 +99,7 @@ exports.handler = async () => {
     }
 
     const result = {
-      sdk: 'javascript/0.1.1',
+      sdk: 'javascript/0.2.0',
       databaseDml: true,
       storageStreaming: true,
       mailIdempotency: true,
