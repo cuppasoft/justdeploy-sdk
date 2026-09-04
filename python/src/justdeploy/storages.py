@@ -1,6 +1,7 @@
 import asyncio
 import builtins
 from contextlib import suppress
+from datetime import datetime
 from typing import cast
 
 import httpx
@@ -8,9 +9,39 @@ import httpx
 from ._transport import AsyncTransport, SyncTransport
 from ._validation import page_query, path_segment
 from .errors import JustDeployError, JustDeployValidationError
-from .types import AsyncFileDownload, AsyncUploadBody, FileDownload, FileInfo, FilePage, Storage, StoredFile, SyncUploadBody
+from .types import AsyncFileDownload, AsyncUploadBody, FileDownload, FileInfo, FilePage, Storage, StoredFile, SyncUploadBody, UploadUrl
 
 _ASYNC_CLEANUP_TASKS: set[asyncio.Task[None]] = set()
+
+
+class _PreparedFile(FileInfo, total=False):
+    expiresAt: str
+
+
+def _validate_upload_info(name: str, mime: str) -> None:
+    if not isinstance(name, str) or not name:
+        raise JustDeployValidationError("upload name must be a non-empty string.")
+    if not isinstance(mime, str) or not mime:
+        raise JustDeployValidationError("upload mime must be a non-empty string.")
+
+
+def _prepared_file(result: object) -> _PreparedFile:
+    files = result.get("files") if isinstance(result, dict) else None
+    file = files[0] if isinstance(files, list) and files else None
+    if not isinstance(file, dict) or not isinstance(file.get("id"), str) or not isinstance(file.get("url"), str):
+        raise JustDeployError("JustDeploy returned an invalid file upload response.")
+    return cast(_PreparedFile, file)
+
+
+def _browser_upload(file: _PreparedFile, mime: str) -> UploadUrl:
+    expires = file.get("expiresAt")
+    if not isinstance(expires, str):
+        raise JustDeployError("JustDeploy returned an invalid file upload expiry.")
+    try:
+        datetime.fromisoformat(expires)
+    except ValueError:
+        raise JustDeployError("JustDeploy returned an invalid file upload expiry.") from None
+    return {"fileId": file["id"], "url": file["url"], "method": "PUT", "headers": {"content-type": mime}, "expiresAt": expires}
 
 
 def _finish_async_cleanup(task: asyncio.Task[None]) -> None:
@@ -23,6 +54,7 @@ def _finish_async_cleanup(task: asyncio.Task[None]) -> None:
 def _without_url(file: FileInfo) -> StoredFile:
     stored = dict(file)
     stored.pop("url", None)
+    stored.pop("expiresAt", None)
     return cast(StoredFile, stored)
 
 
@@ -106,26 +138,35 @@ class Storages:
         )
         return result["file"]
 
-    def upload(self, storage_id: str, *, name: str, mime: str, data: SyncUploadBody, size: int | None = None) -> StoredFile:
-        if not isinstance(name, str) or not name:
-            raise JustDeployValidationError("upload name must be a non-empty string.")
-        if not isinstance(mime, str) or not mime:
-            raise JustDeployValidationError("upload mime must be a non-empty string.")
-        # S3 presigned PUT rejects HTTP chunked transfer. Validate before creating
-        # the pending file record so an invalid stream cannot leave an orphaned row.
-        content_length = _upload_size(data, size)
-        result = cast(
-            dict[str, builtins.list[FileInfo]],
+    def create_upload_url(self, storage_id: str, *, name: str, mime: str) -> UploadUrl:
+        """Create a new file and browser PUT permission, never refresh an existing file.
+
+        Authorize your app user first; return only this object to the browser.
+        No bytes, metadata wait, automatic retry, or transfer cleanup occur here.
+        """
+        _validate_upload_info(name, mime)
+        return _browser_upload(self._prepare_file(storage_id, name, mime), mime)
+
+    def _prepare_file(self, storage_id: str, name: str, mime: str) -> _PreparedFile:
+        return _prepared_file(
             self._transport.organization_request(
                 "POST",
                 f"/storages/{path_segment(storage_id, 'storage_id')}/files",
                 json_body={"files": [{"name": name, "mime": mime}]},
-            ),
+            )
         )
-        files = result.get("files", [])
-        if not files or not isinstance(files[0].get("url"), str):
-            raise JustDeployError("JustDeploy returned an invalid file upload response.")
-        file = files[0]
+
+    def upload(self, storage_id: str, *, name: str, mime: str, data: SyncUploadBody, size: int | None = None) -> StoredFile:
+        """Upload server-held bytes without waiting for metadata activation.
+
+        Keep browser-direct uploads on the platform's signed-URL flow; do not
+        relay bytes through this server just to use this method.
+        """
+        _validate_upload_info(name, mime)
+        # S3 presigned PUT rejects HTTP chunked transfer. Validate before creating
+        # the pending file record so an invalid stream cannot leave an orphaned row.
+        content_length = _upload_size(data, size)
+        file = self._prepare_file(storage_id, name, mime)
         try:
             response = self._transport.presigned_upload(file["url"], mime=mime, data=data, size=content_length)
         except JustDeployError:
@@ -189,24 +230,25 @@ class AsyncStorages:
         )
         return result["file"]
 
-    async def upload(self, storage_id: str, *, name: str, mime: str, data: AsyncUploadBody, size: int | None = None) -> StoredFile:
-        if not isinstance(name, str) or not name:
-            raise JustDeployValidationError("upload name must be a non-empty string.")
-        if not isinstance(mime, str) or not mime:
-            raise JustDeployValidationError("upload mime must be a non-empty string.")
-        content_length = _upload_size(data, size)
-        result = cast(
-            dict[str, builtins.list[FileInfo]],
+    async def create_upload_url(self, storage_id: str, *, name: str, mime: str) -> UploadUrl:
+        """Async Storages.create_upload_url: same app authorization and new-file contract."""
+        _validate_upload_info(name, mime)
+        return _browser_upload(await self._prepare_file(storage_id, name, mime), mime)
+
+    async def _prepare_file(self, storage_id: str, name: str, mime: str) -> _PreparedFile:
+        return _prepared_file(
             await self._transport.organization_request(
                 "POST",
                 f"/storages/{path_segment(storage_id, 'storage_id')}/files",
                 json_body={"files": [{"name": name, "mime": mime}]},
-            ),
+            )
         )
-        files = result.get("files", [])
-        if not files or not isinstance(files[0].get("url"), str):
-            raise JustDeployError("JustDeploy returned an invalid file upload response.")
-        file = files[0]
+
+    async def upload(self, storage_id: str, *, name: str, mime: str, data: AsyncUploadBody, size: int | None = None) -> StoredFile:
+        """Async Storages.upload: same metadata and browser-direct upload rules."""
+        _validate_upload_info(name, mime)
+        content_length = _upload_size(data, size)
+        file = await self._prepare_file(storage_id, name, mime)
         try:
             response = await self._transport.presigned_upload(file["url"], mime=mime, data=data, size=content_length)
         except (JustDeployError, asyncio.CancelledError):

@@ -24,6 +24,7 @@ from .types import (
     SyncUploadBody,
     Table,
     UpdateTableInput,
+    UploadUrl,
 )
 
 __all__ = [
@@ -55,5 +56,6 @@ __all__ = [
     "SyncUploadBody",
     "Table",
     "UpdateTableInput",
+    "UploadUrl",
     "__version__",
 ]

@@ -11,13 +11,28 @@ interface ApiRequestOptions extends RequestOptions {
   headers?: Readonly<Record<string, string>>;
 }
 
-async function responsePayload(response: Response): Promise<unknown> {
-  const text = await response.text();
+function interruptionMessage(signal: AbortSignal | null | undefined, subject: string): string | undefined {
+  if (!signal?.aborted) return undefined;
+  return signal.reason instanceof DOMException && signal.reason.name === 'TimeoutError'
+    ? `${subject} timed out.`
+    : `${subject} was canceled.`;
+}
+
+async function responsePayload(response: Response, signal: AbortSignal): Promise<unknown> {
+  const details = { status: response.status, requestId: response.headers.get('x-request-id') };
+  let text: string;
+  try {
+    text = await response.text();
+  } catch {
+    // Receiving headers does not mean the response body arrived. Never expose the
+    // native exception, which may contain a URL, credentials, or response data.
+    throw new JustDeployError(interruptionMessage(signal, 'The JustDeploy API response') ?? 'The JustDeploy API response could not be fully read.', details);
+  }
   if (text.length === 0) return undefined;
   try {
     return JSON.parse(text) as unknown;
   } catch {
-    throw new JustDeployError('JustDeploy returned a response that was not valid JSON.', { status: response.status });
+    throw new JustDeployError('JustDeploy returned a response that was not valid JSON.', details);
   }
 }
 
@@ -91,11 +106,7 @@ export class Transport {
     try {
       response = await this.fetcher(resolved, request);
     } catch {
-      const message = options.signal?.aborted
-        ? 'The JustDeploy request was canceled.'
-        : requestSignal.aborted
-          ? 'The JustDeploy request timed out.'
-          : 'The JustDeploy request failed before the server returned a response.';
+      const message = interruptionMessage(requestSignal, 'The JustDeploy request') ?? 'The JustDeploy request failed before the server returned a response.';
       throw new JustDeployError(message);
     }
 
@@ -105,7 +116,7 @@ export class Transport {
       return this.send<T>(method, path, refreshed, options, true);
     }
 
-    const payload = await responsePayload(response);
+    const payload = await responsePayload(response, requestSignal);
     if (!response.ok) throw apiError(response, payload);
     return payload as T;
   }
@@ -124,7 +135,7 @@ export class Transport {
     try {
       return await this.fetcher(parsed, { ...init, redirect: 'error' });
     } catch {
-      throw new JustDeployError(init.signal?.aborted ? 'The file transfer was canceled.' : 'The file transfer failed before the server returned a response.');
+      throw new JustDeployError(interruptionMessage(init.signal, 'The file transfer') ?? 'The file transfer failed before the server returned a response.');
     }
   }
 

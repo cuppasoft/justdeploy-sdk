@@ -6,6 +6,8 @@ Official server-side SDKs for [JustDeploy](https://justdeploy.ai).
 >
 > Production supports SDK authentication. Local applications use Credential environment variables; deployed web, API, and cron applications can use automatic identity. Development remains limited to Playground.
 
+The working source and language guides target the **0.2.0 release candidate** with bound query values and browser-direct upload preparation. The install commands below still point to public 0.1.1 until registry verification finishes.
+
 ## Supported runtimes
 
 | Language              | Runtime                     | Package                                    |
@@ -80,8 +82,12 @@ In Production and the Development Playground, sessions can access every External
 - Authentication exchanges have a 10-second timeout; ordinary JustDeploy API requests have a 30-second timeout. Node.js accepts `AbortSignal`, and Python async calls use normal task cancellation.
 - After a 401, only a GET may refresh the session and repeat once. Database queries, Mail sends, and file mutations are never automatically repeated.
 - File transfers stream without collecting the entire file in memory. A transfer that has started is not interrupted just because the session expires. For stream inputs, provide the exact byte count as described in the language guides.
-- A successful upload returns the transferred `size`. Server metadata may still be `pending`; read it again after it becomes `active` if the final record is needed. A download requested too early returns a clear retry-later error. Failed or canceled uploads try to remove the pending file record while preserving the original error or cancellation.
-- Mail uses the argument `sender` in both languages and sends it as the API's `from` field. Use a stable idempotency key if the caller retries; an accepted send is not proof of delivery.
+- A successful upload returns the transferred `size`. Once PUT succeeds, the file can be read without waiting for `active`; metadata may still be `pending`. Before PUT succeeds, `pending` alone does not prove bytes exist. Read again only if final metadata is needed. Failed or canceled uploads try to remove the pending file record while preserving the original error or cancellation.
+- Mail uses SDK input `sender`; REST input and response records use `from`. A retry of one operation uses the same idempotency key and content; a new password reset needs a new key. The same key with changed content is rejected with 409. `delivered` means recipient-server acceptance, not inbox placement.
+
+Mail is sent through Amazon SES. Keep the console's DKIM CNAME records while using JustDeploy Mail. The default envelope sender uses an amazonses.com domain; adding SPF to the visible From domain does not change that path. HTML mail includes an open-tracking image with no per-message off option. `openedAt` can be affected by image blocking and preloading, so it is not proof that a person read the message.
+
+Authentication and API deadlines are separate, not a single 30-second total-call budget. An app deadline must account for both. Node.js request signals do not cancel the shared authentication exchange, and cancellation never proves a server write was rolled back. Do not remove all deadlines or automatically retry writes to hide a timeout.
 
 Language-specific errors and streaming examples are in the [Node.js](javascript/README.md) and [Python](python/README.md) guides. Do not log authentication values, signatures, SQL, or file contents.
 

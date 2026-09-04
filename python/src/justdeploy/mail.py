@@ -44,6 +44,13 @@ class MailClient:
         tag: str | None = None,
         idempotency_key: str | None = None,
     ) -> Mail:
+        """Send one message; sender maps to the REST request and result field from.
+
+        Retry a logical message with the same idempotency_key and payload.
+        New actions, including another password reset, need new keys; changed
+        content with the same key is rejected with 409. Keys are not generated.
+        HTML messages currently include an open-tracking image, with no opt-out input.
+        """
         body, headers = _mail_request(
             sender=sender,
             to=to,
@@ -79,6 +86,7 @@ class AsyncMailClient:
         tag: str | None = None,
         idempotency_key: str | None = None,
     ) -> Mail:
+        """Async MailClient.send: same sender, idempotency, and tracking rules."""
         body, headers = _mail_request(
             sender=sender,
             to=to,

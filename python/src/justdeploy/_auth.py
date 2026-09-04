@@ -290,6 +290,8 @@ class SyncAuthManager:
         url, headers, body = _build_request(resolved, self._clock())
         try:
             response = self._client.post(url, headers=headers, json=body, timeout=AUTH_TIMEOUT_SECONDS, follow_redirects=False)
+        except httpx.TimeoutException:
+            raise JustDeployAuthenticationError("JustDeploy authentication timed out.") from None
         except httpx.HTTPError:
             raise JustDeployAuthenticationError("JustDeploy authentication failed before the server returned a response.") from None
         return _session_from_response(response, resolved.api_origin, self._clock())
@@ -347,6 +349,8 @@ class AsyncAuthManager:
         url, headers, body = _build_request(resolved, self._clock())
         try:
             response = await self._client.post(url, headers=headers, json=body, timeout=AUTH_TIMEOUT_SECONDS, follow_redirects=False)
+        except httpx.TimeoutException:
+            raise JustDeployAuthenticationError("JustDeploy authentication timed out.") from None
         except httpx.HTTPError:
             raise JustDeployAuthenticationError("JustDeploy authentication failed before the server returned a response.") from None
         return _session_from_response(response, resolved.api_origin, self._clock())

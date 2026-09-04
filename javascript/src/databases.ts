@@ -1,6 +1,6 @@
 import { JustDeployValidationError } from './errors.js';
 import { Transport } from './transport.js';
-import type { CreateTableInput, Database, QueryResult, RequestOptions, Table, UpdateTableInput } from './types.js';
+import type { CreateTableInput, Database, JsonPrimitive, QueryOptions, QueryResult, RequestOptions, Table, UpdateTableInput } from './types.js';
 import { pathSegment } from './validation.js';
 
 export class Databases {
@@ -11,13 +11,28 @@ export class Databases {
     return result.databases;
   }
 
-  async query(databaseId: string, sql: string, options: RequestOptions = {}): Promise<QueryResult> {
+  /**
+   * Executes one statement; separate calls do not share a transaction.
+   * Pass user values in options.params for ? placeholders. Never interpolate raw input.
+   */
+  async query(databaseId: string, sql: string, options: QueryOptions = {}): Promise<QueryResult> {
     if (typeof sql !== 'string' || sql.trim().length === 0) {
       throw new JustDeployValidationError('sql must be a non-empty string.');
     }
+    const params: JsonPrimitive[] = [];
+    if (options.params !== undefined) {
+      const invalid = () => new JustDeployValidationError('params must be an array of strings, finite numbers, booleans, or null. Use strings for large integers and exact decimals.');
+      if (!Array.isArray(options.params)) throw invalid();
+      for (const value of options.params) {
+        if (value === null || typeof value === 'string' || typeof value === 'boolean' ||
+          (typeof value === 'number' && Number.isFinite(value) && (!Number.isInteger(value) || Number.isSafeInteger(value)))) params.push(value);
+        else throw invalid();
+      }
+    }
+    const { params: _params, ...requestOptions } = options;
     return this.transport.organizationRequest<QueryResult>('POST', `/databases/${pathSegment(databaseId, 'databaseId')}/query`, {
-      ...options,
-      body: { query: sql },
+      ...requestOptions,
+      body: { query: sql, ...(options.params === undefined ? {} : { params }) },
     });
   }
 

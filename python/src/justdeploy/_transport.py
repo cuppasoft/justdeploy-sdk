@@ -40,7 +40,11 @@ def _payload(response: httpx.Response) -> object:
     try:
         return response.json()
     except (ValueError, UnicodeDecodeError):
-        raise JustDeployError("JustDeploy returned a response that was not valid JSON.", status=response.status_code) from None
+        raise JustDeployError(
+            "JustDeploy returned a response that was not valid JSON.",
+            status=response.status_code,
+            request_id=response.headers.get("x-request-id"),
+        ) from None
 
 
 def _json_content(value: object) -> bytes:
@@ -112,8 +116,10 @@ class SyncTransport:
                 timeout=API_TIMEOUT_SECONDS,
                 follow_redirects=False,
             )
+        except httpx.TimeoutException:
+            raise JustDeployError("The JustDeploy API request timed out.") from None
         except httpx.HTTPError:
-            raise JustDeployError("The JustDeploy request failed before the server returned a response.") from None
+            raise JustDeployError("The JustDeploy API request could not be completed.") from None
         if response.status_code == 401 and method == "GET" and not replayed:
             response.close()
             refreshed = self.auth.refresh_after_unauthorized(session.token)
@@ -135,6 +141,8 @@ class SyncTransport:
             for name in TRANSFER_FORBIDDEN_HEADERS:
                 request.headers.pop(name, None)
             return self.client.send(request, follow_redirects=False)
+        except httpx.TimeoutException:
+            raise JustDeployError("The file transfer timed out.") from None
         except Exception:
             raise JustDeployError("The file transfer failed before the server returned a response.") from None
 
@@ -145,6 +153,8 @@ class SyncTransport:
             for name in TRANSFER_FORBIDDEN_HEADERS:
                 request.headers.pop(name, None)
             return self.client.send(request, stream=True, follow_redirects=False)
+        except httpx.TimeoutException:
+            raise JustDeployError("The file transfer timed out.") from None
         except Exception:
             raise JustDeployError("The file transfer failed before the server returned a response.") from None
 
@@ -193,8 +203,10 @@ class AsyncTransport:
                 timeout=API_TIMEOUT_SECONDS,
                 follow_redirects=False,
             )
+        except httpx.TimeoutException:
+            raise JustDeployError("The JustDeploy API request timed out.") from None
         except httpx.HTTPError:
-            raise JustDeployError("The JustDeploy request failed before the server returned a response.") from None
+            raise JustDeployError("The JustDeploy API request could not be completed.") from None
         if response.status_code == 401 and method == "GET" and not replayed:
             await response.aclose()
             refreshed = await self.auth.refresh_after_unauthorized(session.token)
@@ -216,6 +228,8 @@ class AsyncTransport:
             for name in TRANSFER_FORBIDDEN_HEADERS:
                 request.headers.pop(name, None)
             return await self.client.send(request, follow_redirects=False)
+        except httpx.TimeoutException:
+            raise JustDeployError("The file transfer timed out.") from None
         except Exception:
             raise JustDeployError("The file transfer failed before the server returned a response.") from None
 
@@ -226,5 +240,7 @@ class AsyncTransport:
             for name in TRANSFER_FORBIDDEN_HEADERS:
                 request.headers.pop(name, None)
             return await self.client.send(request, stream=True, follow_redirects=False)
+        except httpx.TimeoutException:
+            raise JustDeployError("The file transfer timed out.") from None
         except Exception:
             raise JustDeployError("The file transfer failed before the server returned a response.") from None

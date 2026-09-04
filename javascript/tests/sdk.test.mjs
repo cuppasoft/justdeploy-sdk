@@ -12,6 +12,7 @@ import { JustDeploy, JustDeployAuthenticationError, JustDeployConfigurationError
 import { MailClient } from '../dist/esm/mail.js';
 import { Storages } from '../dist/esm/storages.js';
 import { Transport } from '../dist/esm/transport.js';
+import { SDK_VERSION } from '../dist/esm/version.js';
 
 const API = 'https://api.justdeploy.net';
 const ORG = 'abcdefghijklmnop';
@@ -42,6 +43,107 @@ function credentialStack(fetcher, now) {
   return new Transport(auth, fetcher);
 }
 
+test('query parameters stay separate from SQL and preserve the existing signal and response', async () => {
+  const calls = [];
+  const transport = credentialStack(async (input, init) => {
+    if (String(input).endsWith('/auth/credential')) return session();
+    calls.push({ body: JSON.parse(init.body), signal: init.signal });
+    return json({ rows: [{ answer: 42 }] });
+  });
+  const database = new Databases(transport);
+  const params = ["한글 ' \\ 😀 ?; DROP TABLE notes;", null, true, false, 1.5, 42, '9007199254740993', '0.00000000000000000001'];
+  const sql = `SELECT ${params.map(() => '?').join(', ')}`;
+  const controller = new AbortController();
+  assert.deepEqual(await database.query('db', sql, { params, signal: controller.signal }), { rows: [{ answer: 42 }] });
+  assert.deepEqual(calls[0].body, { query: sql, params });
+  controller.abort();
+  assert.equal(calls[0].signal.aborted, true);
+  await database.query('db', "SELECT '?'", { params: [] });
+  assert.deepEqual(calls[1].body, { query: "SELECT '?'", params: [] });
+  await database.query('db', 'SELECT 1');
+  assert.deepEqual(calls[2].body, { query: 'SELECT 1' });
+});
+
+test('invalid query parameters are rejected before authentication without exposing values', async () => {
+  const database = new Databases(credentialStack(async () => { assert.fail('invalid input must not cause network I/O'); }));
+  for (const params of [null, 'secret-value', {}, [undefined], [NaN], [Infinity], [2 ** 53], [[1]], [{ secret: 'value' }], new Array(1)]) {
+    await assert.rejects(database.query('db', 'SELECT ?', { params }), (error) => {
+      assert.ok(error instanceof JustDeployValidationError);
+      assert.doesNotMatch(error.message, /secret/);
+      return true;
+    });
+  }
+});
+
+test('response body interruptions stay structured and never retry a write', async () => {
+  for (const status of [200, 503]) {
+    let writes = 0;
+    const transport = credentialStack(async (input) => {
+      if (String(input).endsWith('/auth/credential')) return session();
+      writes += 1;
+      return new Response(new ReadableStream({ start(controller) { controller.error(new Error('secret-body-and-url')); } }), {
+        status, headers: { 'x-request-id': 'body-request' },
+      });
+    });
+    await assert.rejects(transport.organizationRequest('POST', '/databases/db/query', { body: { query: 'SELECT 1' } }), (error) => {
+      assert.ok(error instanceof JustDeployError);
+      assert.equal(error.status, status);
+      assert.equal(error.requestId, 'body-request');
+      assert.match(error.message, /API response could not be fully read/);
+      assert.doesNotMatch(JSON.stringify(error), /secret-body-and-url/);
+      return true;
+    });
+    assert.equal(writes, 1);
+  }
+});
+
+test('caller deadlines and cancellation are distinguished for API and file requests', async () => {
+  for (const [reason, expected] of [[new DOMException('private reason', 'TimeoutError'), /timed out/], [new Error('private reason'), /canceled/]]) {
+    for (const phase of ['request', 'body', 'file']) {
+      const signal = AbortSignal.abort(reason);
+      const transport = credentialStack(async (input) => {
+        if (String(input).endsWith('/auth/credential')) return session();
+        if (phase !== 'body') throw reason;
+        return new Response(new ReadableStream({ start(controller) { controller.error(reason); } }));
+      });
+      const promise = phase === 'file'
+        ? transport.presigned('https://files.example.test/file', { method: 'PUT', signal })
+        : transport.organizationRequest('POST', '/mails', { signal });
+      await assert.rejects(promise, (error) => {
+        assert.ok(error instanceof JustDeployError);
+        assert.match(error.message, expected);
+        assert.match(error.message, phase === 'file' ? /file transfer/ : /JustDeploy/);
+        assert.doesNotMatch(error.message, /private reason/);
+        return true;
+      });
+    }
+  }
+});
+
+test('invalid JSON retains response diagnostics without exposing the body', async () => {
+  const transport = credentialStack(async (input) => String(input).endsWith('/auth/credential')
+    ? session()
+    : new Response('secret non-JSON', { status: 502, headers: { 'x-request-id': 'invalid-json' } }));
+  await assert.rejects(transport.organizationRequest('GET', '/databases'), (error) => {
+    assert.ok(error instanceof JustDeployError);
+    assert.equal(error.status, 502);
+    assert.equal(error.requestId, 'invalid-json');
+    assert.doesNotMatch(error.message, /secret/);
+    return true;
+  });
+});
+
+test('authentication deadlines identify the authentication stage', async (t) => {
+  t.mock.method(AbortSignal, 'timeout', () => AbortSignal.abort(new DOMException('private reason', 'TimeoutError')));
+  for (const bodyFailure of [false, true]) {
+    const auth = new AuthManager({ env: { JUSTDEPLOY_ACCESS_KEY: 'test', JUSTDEPLOY_SECRET_KEY: 'test' }, identityPath: '/does/not/exist', fetcher: async () => {
+      if (!bodyFailure) throw new Error('private reason');
+      return new Response(new ReadableStream({ start(controller) { controller.error(new Error('private reason')); } }));
+    } });
+    await assert.rejects(auth.getSession(), (error) => error instanceof JustDeployAuthenticationError && error.message === 'JustDeploy authentication timed out.');
+  }
+});
+
 test('exports work from ESM and CommonJS without doing network I/O', () => {
   assert.equal(typeof JustDeploy, 'function');
   assert.ok(new JustDeploy().databases);
@@ -68,7 +170,7 @@ test('credential exchange has priority and supplies the API session header', asy
   assert.equal(calls[0].init.body, '{}');
   assert.equal(calls[1].url, `${API}/organizations/${ORG}/databases`);
   assert.equal(header(calls[1].init, 'authorization'), 'Bearer session-token');
-  assert.equal(header(calls[1].init, 'x-justdeploy-sdk'), 'javascript/0.1.1');
+  assert.equal(header(calls[1].init, 'x-justdeploy-sdk'), `javascript/${SDK_VERSION}`);
 });
 
 test('partial or empty local credentials fail and never fall back to identity', async () => {
@@ -259,6 +361,49 @@ test('database and mail methods use the exact API paths, bodies, and pagination'
   assert.equal(dataCalls[6].url, `${API}/organizations/${ORG}/mails?limit=20&cursor=42`);
 });
 
+test('browser upload preparation returns only PUT permission and never transfers bytes', async () => {
+  const calls = [];
+  const url = 'https://files.example.test/upload?signature=private';
+  const storages = new Storages(credentialStack(async (input, init) => {
+    if (String(input).endsWith('/auth/credential')) return session();
+    calls.push({ url: String(input), body: JSON.parse(init.body), method: init.method });
+    return json({ files: [{ id: `file-${calls.length}`, url, expiresAt: EXPIRY, status: 'pending', unexpected: 'not-for-browser' }] }, 201);
+  }));
+  const first = await storages.createUploadUrl('storage-id', { name: 'image.jpg', mime: 'image/jpeg' });
+  assert.deepEqual(first, { fileId: 'file-1', url, method: 'PUT', headers: { 'content-type': 'image/jpeg' }, expiresAt: EXPIRY });
+  assert.equal((await storages.createUploadUrl('storage-id', { name: 'image.jpg', mime: 'image/jpeg' })).fileId, 'file-2');
+  assert.ok(calls.every((call) => call.url === `${API}/organizations/${ORG}/storages/storage-id/files` && call.method === 'POST'));
+  assert.deepEqual(calls[0].body, { files: [{ name: 'image.jpg', mime: 'image/jpeg' }] });
+});
+
+test('browser upload does not guess expiry or retry preparation failures', async () => {
+  for (const result of [null, { files: [] }, { files: [{ id: 'f', url: 'https://files.example.test/secret' }] }, { files: [{ id: 'f', url: 'https://files.example.test/secret', expiresAt: 'bad' }] }]) {
+    let calls = 0;
+    const storages = new Storages(credentialStack(async (input) => {
+      if (String(input).endsWith('/auth/credential')) return session();
+      calls += 1;
+      return json(result);
+    }));
+    await assert.rejects(storages.createUploadUrl('storage', { name: 'file', mime: 'text/plain' }), (error) => error instanceof JustDeployError && !error.message.includes('secret'));
+    assert.equal(calls, 1);
+  }
+  let calls = 0;
+  const storages = new Storages(credentialStack(async (input) => {
+    if (String(input).endsWith('/auth/credential')) return session();
+    calls += 1;
+    return json({ message: 'expired' }, 401);
+  }));
+  await assert.rejects(storages.createUploadUrl('storage', { name: 'file', mime: 'text/plain' }), JustDeployError);
+  assert.equal(calls, 1);
+  const invalid = new Storages(credentialStack(async () => { assert.fail('invalid input must not authenticate'); }));
+  await assert.rejects(invalid.createUploadUrl('storage', { name: '', mime: 'text/plain' }), JustDeployValidationError);
+});
+
+test('null authentication payload remains an authentication error', async () => {
+  const auth = new AuthManager({ env: { JUSTDEPLOY_ACCESS_KEY: 'test', JUSTDEPLOY_SECRET_KEY: 'test' }, identityPath: '/does/not/exist', fetcher: async () => json(null) });
+  await assert.rejects(auth.getSession(), JustDeployAuthenticationError);
+});
+
 test('presigned upload and download never receive JustDeploy authentication headers', async () => {
   const calls = [];
   const uploadUrl = 'https://uploads.example.test/object?signature=upload';
@@ -271,7 +416,7 @@ test('presigned upload and download never receive JustDeploy authentication head
     const url = String(input);
     calls.push({ url, init });
     if (url.includes('/auth/')) return session();
-    if (url.endsWith('/files') && init.method === 'POST') return json({ files: [{ ...file, size: 0, status: 'pending', url: uploadUrl }] }, 201);
+    if (url.endsWith('/files') && init.method === 'POST') return json({ files: [{ ...file, size: 0, status: 'pending', url: uploadUrl, expiresAt: EXPIRY }] }, 201);
     if (url === uploadUrl) return new Response(null, { status: 200 });
     if (url.endsWith('/files/file-id')) return json({ file: { ...file, url: downloadUrl } });
     if (url === downloadUrl) return new Response('hello', { status: 200, headers: { 'content-type': 'text/plain', 'content-length': '5' } });
@@ -281,6 +426,7 @@ test('presigned upload and download never receive JustDeploy authentication head
 
   const uploaded = await storages.upload('storage-id', { name: 'hello.txt', mime: 'text/plain', data: new TextEncoder().encode('hello') });
   assert.equal('url' in uploaded, false);
+  assert.equal('expiresAt' in uploaded, false);
   assert.equal(uploaded.size, 5);
   assert.equal(uploaded.status, 'pending');
   const downloaded = await storages.download('storage-id', 'file-id');

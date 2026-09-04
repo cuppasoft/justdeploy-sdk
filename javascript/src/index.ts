@@ -5,6 +5,7 @@ export type {
   ColumnDefinition,
   ColumnType,
   CreateTableInput,
+  CreateUploadUrlInput,
   Database,
   FileDownload,
   FileInfo,
@@ -17,6 +18,7 @@ export type {
   MailStatus,
   PageOptions,
   QueryResult,
+  QueryOptions,
   RequestOptions,
   SendMailInput,
   Storage,
@@ -25,4 +27,5 @@ export type {
   UpdateTableInput,
   UploadBody,
   UploadInput,
+  UploadUrl,
 } from './types.js';

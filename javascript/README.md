@@ -2,12 +2,12 @@
 
 The official JustDeploy SDK for server-side Node.js 22 and 24. The package includes ESM, CommonJS, and TypeScript declarations.
 
-> SDK 0.1.1 is public. Production supports local Credential authentication and automatic identity in deployed web, API, and cron applications. Development SDK access remains limited to Playground.
+Production supports local Credential authentication and automatic identity in deployed web, API, and cron applications. Development SDK access remains limited to Playground.
 
 ## Install
 
 ```bash
-npm install @justdeploy/sdk@0.1.1
+npm install @justdeploy/sdk@0.2.0
 ```
 
 ## Client
@@ -34,7 +34,8 @@ For local development, set both `JUSTDEPLOY_ACCESS_KEY` and `JUSTDEPLOY_SECRET_K
 
 ```ts
 const databases = await justdeploy.databases.list();
-const result = await justdeploy.databases.query(databaseId, 'SELECT * FROM orders');
+const result = await justdeploy.databases.query(databaseId,
+  'SELECT * FROM orders WHERE customer = ?', { params: [customer] });
 
 const tables = await justdeploy.databases.listTables(databaseId);
 const table = await justdeploy.databases.createTable(databaseId, {
@@ -49,9 +50,43 @@ await justdeploy.databases.deleteTable(databaseId, 'orders');
 
 `query` accepts only the data statements allowed by the JustDeploy API. Use the table methods for schema changes.
 
-Prepare schema once before starting the application. A read returns `{ rows }`; a write returns `{ id }`, not `affectedRows`. The SQL argument is a string, not a parameter array; follow your `DATABASE.md` for safe text values.
+Prepare schema once before starting the application. A read returns `{ rows }`; a write returns `{ id }`, not `affectedRows`. Separate calls do not share a transaction.
+
+Pass input values in `params`, using one unquoted `?` per value. Strings, finite numbers, booleans and null are supported. Send integers outside ±9,007,199,254,740,991 and exact decimals as strings; serialize dates and JSON explicitly. Objects, nested arrays and undefined are rejected. Never interpolate user input or quote the placeholders yourself.
+
+Placeholders cannot replace table/column names or SQL fragments. Keep identifiers fixed or use an app-owned allowlist. `LIMIT ?` is not supported; validate a bounded integer before placing a LIMIT number in SQL. Calls without parameters and the existing `signal` option remain supported.
 
 ## Storage
+
+### Browser files: direct upload
+
+On your app server, authenticate the user and check upload permission before calling:
+
+```ts
+const upload = await justdeploy.storages.createUploadUrl(storageId, {
+  name: 'image.jpg', mime: 'image/jpeg',
+});
+// Return only upload to that browser, with Cache-Control: no-store.
+```
+
+It returns `{ fileId, url, method: 'PUT', headers, expiresAt }`. In the browser:
+
+```js
+const response = await fetch(upload.url, {
+  method: upload.method, headers: upload.headers, body: selectedFile,
+  credentials: 'omit', redirect: 'error',
+});
+if (!response.ok) throw new Error(`Upload failed (${response.status}).`);
+// Save upload.fileId through your app API. No active-state wait is needed.
+```
+
+File bytes go directly to Storage. Do not install the SDK in the browser or send it a Credential/session token. Do not add Authorization or Content-Length. The platform manages browser access; no bucket/origin configuration is required.
+
+The URL is temporary bearer permission: do not log, cache or persist it. `expiresAt` is the latest permitted expiry and revocation can invalidate it earlier. It is not one-time and can overwrite the same file while valid. App-side size checks are not an enforced upload-size limit.
+
+Every call prepares a **new file** and is never automatically retried. A lost response may already have created a file; do not blindly create another. For explicit cancellation, delete the file if its ID is known. Platform cleanup covers abandoned pending files; this method cannot observe browser failures or clean them up immediately.
+
+### Server files: upload bytes or a stream
 
 ```ts
 const storages = await justdeploy.storages.list();
@@ -77,7 +112,7 @@ await justdeploy.storages.deleteFile(storageId, file.id);
 For a web stream or async iterable, also pass the exact byte length as `size`; sized values such as strings, blobs, and byte arrays are measured automatically.
 If a download races with a still-finishing upload, retry after the SDK's clear pending-upload error.
 
-Upload results have no signed URL. `file.size` is the number of bytes successfully transferred. Recorded metadata may remain `pending` briefly: use `getFile` after it becomes `active` for the final server record. Save the file ID, not the expiring URL. When redirecting a browser, use `(await justdeploy.storages.getFile(storageId, fileId)).url` without buffering the download.
+Upload results have no signed URL. `file.size` is the number of bytes successfully transferred. After PUT succeeds, the file can be read without waiting for `active`; metadata may still be `pending`. Before PUT succeeds, `pending` alone does not prove bytes exist. Use `getFile` again only when final metadata is needed. Save the file ID, not the expiring URL. When redirecting a browser, use `(await justdeploy.storages.getFile(storageId, fileId)).url` without buffering the download.
 
 For pagination, pass `page.nextCursor` as the next call's `cursor` until it is null.
 
@@ -96,11 +131,11 @@ const page = await justdeploy.mail.list({ limit: 50 });
 const current = await justdeploy.mail.get(mail.id);
 ```
 
-Use a stable, unique `idempotencyKey` when a caller might retry a mail request after losing the response. A successful send response means accepted, not delivered; check `mail.status` later if delivery matters.
+Use one `idempotencyKey` per operation. A retry keeps its key and content; each new password reset needs a new key. The same key with different content is rejected with 409. SDK input uses `sender`; REST input and returned records use `from`. `delivered` means the receiving server accepted the message, not inbox placement. See the shared [Mail and tracking rules](../README.md#request-behavior).
 
 ## Errors and cancellation
 
-All SDK and API failures extend `JustDeployError`. API errors expose `status`, `retryAfter`, `requestId`, and `details`. Request bodies, SQL, file content, and authentication values are not retained in SDK errors.
+Handle SDK failures with `JustDeployError`. API errors expose `status`, `retryAfter`, `requestId`, and `details`. For diagnostics, record only `status` and `requestId`, not the whole error, request, SQL, file contents, or credentials. Cancellation does not prove a write was rolled back. Authentication and API time limits are separate; see [request behavior](../README.md#request-behavior).
 
 Methods that accept request options support an `AbortSignal`:
 

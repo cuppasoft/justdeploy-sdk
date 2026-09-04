@@ -3,12 +3,21 @@ export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue
 export type JsonObject = { [key: string]: JsonValue };
 
 export interface RequestOptions {
+  /**
+   * Cancels the API/file request, not a shared authentication exchange.
+   * Canceling a write does not prove that the server rolled it back.
+   */
   signal?: AbortSignal;
 }
 
 export interface PageOptions extends RequestOptions {
   limit?: number;
   cursor?: number;
+}
+
+export interface QueryOptions extends RequestOptions {
+  /** Values for ? placeholders, never identifiers or SQL fragments. Use strings for large integers and exact decimals. */
+  params?: readonly JsonPrimitive[];
 }
 
 export interface Database {
@@ -74,6 +83,7 @@ export interface StoredFile {
   path: string;
   mime: string;
   size: number;
+  /** Metadata state: a completed upload may still be pending while its bytes are already readable. */
   status: 'pending' | 'active' | 'deleted';
   error: string | null;
   createdAt: string;
@@ -81,19 +91,32 @@ export interface StoredFile {
 }
 
 export interface FileInfo extends StoredFile {
-  /** A short-lived URL. Prefer `storages.download()` when reading bytes. */
+  /** Short-lived download URL. Use for browser redirects; use download() to read bytes on the server. */
   url: string;
 }
 
 export type UploadBody = string | Blob | ArrayBuffer | Uint8Array | ReadableStream<Uint8Array> | AsyncIterable<Uint8Array>;
 
-export interface UploadInput {
+export interface CreateUploadUrlInput {
   name: string;
   mime: string;
+  signal?: AbortSignal;
+}
+
+export interface UploadUrl {
+  fileId: string;
+  /** Temporary bearer URL. Do not log/store it or send organization credentials with it. */
+  url: string;
+  method: 'PUT';
+  headers: { 'content-type': string };
+  /** Latest expiry reported by the server; may be invalidated earlier. Not a one-time URL. */
+  expiresAt: string;
+}
+
+export interface UploadInput extends CreateUploadUrlInput {
   data: UploadBody;
   /** Exact byte length. Required only for ReadableStream and AsyncIterable uploads. */
   size?: number;
-  signal?: AbortSignal;
 }
 
 export interface FilePage {
@@ -116,7 +139,9 @@ export interface Mail {
   to: string;
   status: MailStatus;
   tag: string | null;
+  /** Recipient server acceptance, not proof of inbox placement. */
   deliveredAt: string | null;
+  /** Tracking-image activity, not proof a person read the mail; clients may block or preload it. */
   openedAt: string | null;
   error: string | null;
   createdAt: string;
@@ -124,13 +149,19 @@ export interface Mail {
 }
 
 export interface SendMailInput {
+  /** Sender address. The REST request and returned Mail use the field name from. */
   sender: string;
   to: string;
   subject: string;
+  /** HTML messages currently include the platform's open-tracking image; there is no opt-out input yet. */
   html?: string;
   text?: string;
   tag?: string;
-  /** Use a stable unique value when a caller may retry after a timeout. */
+  /**
+   * One key per logical message. Retry that message with the same key and payload;
+   * new actions (such as another password reset) need new keys. Changed content
+   * with the same key is rejected with 409. The SDK does not generate keys.
+   */
   idempotencyKey?: string;
   signal?: AbortSignal;
 }

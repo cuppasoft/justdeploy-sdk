@@ -268,6 +268,7 @@ export class AuthManager {
   }
 
   private async requestSession(apiOrigin: string, url: string, headers: Record<string, string>, body: string): Promise<AuthSession> {
+    const timeout = AbortSignal.timeout(AUTH_TIMEOUT_MS);
     let response: Response;
     try {
       response = await this.fetcher(url, {
@@ -275,10 +276,10 @@ export class AuthManager {
         headers,
         body,
         redirect: 'error',
-        signal: AbortSignal.timeout(AUTH_TIMEOUT_MS),
+        signal: timeout,
       });
     } catch {
-      throw new JustDeployAuthenticationError('JustDeploy authentication failed before the server returned a response.');
+      throw new JustDeployAuthenticationError(timeout.aborted ? 'JustDeploy authentication timed out.' : 'JustDeploy authentication failed before the server returned a response.');
     }
 
     if (!response.ok) {
@@ -289,14 +290,14 @@ export class AuthManager {
     try {
       payload = (await response.json()) as typeof payload;
     } catch {
-      throw new JustDeployAuthenticationError('JustDeploy returned an invalid authentication response.', {
+      throw new JustDeployAuthenticationError(timeout.aborted ? 'JustDeploy authentication timed out.' : 'JustDeploy returned an invalid authentication response.', {
         status: response.status,
         requestId: response.headers.get('x-request-id'),
       });
     }
-    const expiresAt = typeof payload.expiresAt === 'string' && ISO_TIMESTAMP.test(payload.expiresAt) ? Date.parse(payload.expiresAt) : Number.NaN;
+    const expiresAt = typeof payload?.expiresAt === 'string' && ISO_TIMESTAMP.test(payload.expiresAt) ? Date.parse(payload.expiresAt) : Number.NaN;
     if (
-      typeof payload.token !== 'string' ||
+      typeof payload?.token !== 'string' ||
       payload.token.length === 0 ||
       typeof payload.organizationId !== 'string' ||
       !PLATFORM_ID.test(payload.organizationId) ||

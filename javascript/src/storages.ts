@@ -1,11 +1,22 @@
 import { JustDeployError, JustDeployValidationError } from './errors.js';
 import { Transport } from './transport.js';
-import type { FileDownload, FileInfo, FilePage, PageOptions, RequestOptions, Storage, StoredFile, UploadBody, UploadInput } from './types.js';
+import type { CreateUploadUrlInput, FileDownload, FileInfo, FilePage, PageOptions, RequestOptions, Storage, StoredFile, UploadBody, UploadInput, UploadUrl } from './types.js';
 import { pageQuery, pathSegment } from './validation.js';
 
-function withoutUrl(file: FileInfo): StoredFile {
-  const { url: _url, ...stored } = file;
+type PreparedFile = FileInfo & { expiresAt?: string };
+
+function withoutUrl(file: PreparedFile): StoredFile {
+  const { url: _url, expiresAt: _expiresAt, ...stored } = file;
   return stored;
+}
+
+function validateUploadInfo(input: CreateUploadUrlInput): void {
+  if (typeof input?.name !== 'string' || input.name.length === 0) {
+    throw new JustDeployValidationError('upload name must be a non-empty string.');
+  }
+  if (typeof input.mime !== 'string' || input.mime.length === 0) {
+    throw new JustDeployValidationError('upload mime must be a non-empty string.');
+  }
 }
 function requiresDuplex(body: UploadBody): boolean {
   return typeof body === 'object' && body !== null && (body instanceof ReadableStream || Symbol.asyncIterator in body);
@@ -98,13 +109,26 @@ export class Storages {
     return result.file;
   }
 
+  /**
+   * Creates a new file and its browser PUT permission; never refreshes an existing file.
+   * Authorize your app user first. Return only this object to the browser, not SDK credentials.
+   * PUT success confirms byte transfer. No metadata wait or automatic retry/cleanup is performed here.
+   */
+  async createUploadUrl(storageId: string, input: CreateUploadUrlInput): Promise<UploadUrl> {
+    validateUploadInfo(input);
+    const file = await this.prepareFile(storageId, input);
+    if (typeof file.expiresAt !== 'string' || !Number.isFinite(Date.parse(file.expiresAt))) {
+      throw new JustDeployError('JustDeploy returned an invalid file upload expiry.');
+    }
+    return { fileId: file.id, url: file.url, method: 'PUT', headers: { 'content-type': input.mime }, expiresAt: file.expiresAt };
+  }
+
+  /**
+   * Upload bytes or a stream already available to this server, without waiting for metadata activation.
+   * Keep browser-direct uploads on the platform's signed-URL flow; do not relay bytes just to use this method.
+   */
   async upload(storageId: string, input: UploadInput): Promise<StoredFile> {
-    if (typeof input?.name !== 'string' || input.name.length === 0) {
-      throw new JustDeployValidationError('upload name must be a non-empty string.');
-    }
-    if (typeof input.mime !== 'string' || input.mime.length === 0) {
-      throw new JustDeployValidationError('upload mime must be a non-empty string.');
-    }
+    validateUploadInfo(input);
     if (input.data === undefined || input.data === null) {
       throw new JustDeployValidationError('upload data is required.');
     }
@@ -112,19 +136,7 @@ export class Storages {
     // pending file record so an invalid stream cannot leave an orphaned row.
     const size = uploadByteLength(input.data, input.size);
 
-    const createOptions = {
-      body: { files: [{ name: input.name, mime: input.mime }] },
-      ...(input.signal ? { signal: input.signal } : {}),
-    };
-    const created = await this.transport.organizationRequest<{ files: FileInfo[] }>(
-      'POST',
-      `/storages/${pathSegment(storageId, 'storageId')}/files`,
-      createOptions,
-    );
-    const file = created.files[0];
-    if (!file || typeof file.url !== 'string') {
-      throw new JustDeployError('JustDeploy returned an invalid file upload response.');
-    }
+    const file = await this.prepareFile(storageId, input);
 
     const request: RequestInit = {
       method: 'PUT',
@@ -186,6 +198,20 @@ export class Storages {
       `/storages/${pathSegment(storageId, 'storageId')}/files/${pathSegment(fileId, 'fileId')}`,
       options,
     );
+  }
+
+  private async prepareFile(storageId: string, input: CreateUploadUrlInput): Promise<PreparedFile> {
+    const created = await this.transport.organizationRequest<{ files: PreparedFile[] }>(
+      'POST', `/storages/${pathSegment(storageId, 'storageId')}/files`, {
+        body: { files: [{ name: input.name, mime: input.mime }] },
+        ...(input.signal ? { signal: input.signal } : {}),
+      },
+    );
+    const file = created?.files?.[0];
+    if (!file || typeof file.id !== 'string' || typeof file.url !== 'string') {
+      throw new JustDeployError('JustDeploy returned an invalid file upload response.');
+    }
+    return file;
   }
 
   private async cleanupFailedUpload(storageId: string, fileId: string): Promise<void> {

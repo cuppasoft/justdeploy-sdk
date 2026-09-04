@@ -10,6 +10,7 @@ Use this checklist for each release. Commands and publishing setup are in [READM
 - [ ] Install the candidate archives in clean environments; check ESM/CommonJS and Python sync/async clients.
 - [ ] Verify local Credential authentication, automatic deployed identity, environment-variable priority, cross-organization rejection and secret-free errors.
 - [ ] Verify Database operations, bytes/stream Storage transfers, immediate upload size, cancellation cleanup and Mail idempotency in an approved Development Playground test.
+- [ ] Verify bound SQL values and mismatches before writes, browser-direct PUT from new and existing organizations, exact downloaded bytes, CORS and no Credential/header leakage. Mock tests do not replace the browser check.
 - [ ] Confirm credentials never reach other hosts or signed file URLs, GET retries once on expired authentication, and mutations are not automatically retried.
 - [ ] Test web, API and cron examples. A fresh AI using only the generated guides must be able to develop and deploy without repository-only knowledge.
 

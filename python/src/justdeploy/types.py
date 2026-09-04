@@ -89,6 +89,7 @@ class StoredFile(TypedDict):
     path: str
     mime: str
     size: int
+    # Metadata state: a completed upload may still be pending while its bytes are already readable.
     status: Literal["pending", "active", "deleted"]
     error: str | None
     createdAt: str
@@ -96,7 +97,18 @@ class StoredFile(TypedDict):
 
 
 class FileInfo(StoredFile):
+    # Short-lived download URL: use for browser redirects, or download() for server-side reads.
     url: str
+
+
+class UploadUrl(TypedDict):
+    fileId: str
+    # Temporary bearer permission. Never log/store it or attach organization credentials.
+    url: str
+    method: Literal["PUT"]
+    headers: dict[str, str]
+    # Latest server-reported expiry; may become invalid earlier. Not a one-time URL.
+    expiresAt: str
 
 
 class FilePage(TypedDict):
@@ -119,7 +131,9 @@ Mail = TypedDict(
         "to": str,
         "status": MailStatus,
         "tag": str | None,
+        # Recipient server acceptance, not proof of inbox placement.
         "deliveredAt": str | None,
+        # Tracking-image activity, not proof a person read the mail; clients may block or preload it.
         "openedAt": str | None,
         "error": str | None,
         "createdAt": str,

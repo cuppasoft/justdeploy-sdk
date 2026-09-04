@@ -27,6 +27,7 @@ from justdeploy import (
 )
 from justdeploy._auth import AsyncAuthManager, SyncAuthManager
 from justdeploy._transport import AsyncTransport, SyncTransport
+from justdeploy._version import __version__
 from justdeploy.databases import AsyncDatabases, Databases
 from justdeploy.mail import AsyncMailClient, MailClient
 from justdeploy.storages import AsyncStorages, Storages
@@ -55,6 +56,125 @@ def async_stack(handler: Any) -> tuple[httpx.AsyncClient, AsyncTransport]:
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler), follow_redirects=False)
     auth = AsyncAuthManager(client, env=ENV, identity_path=Path("/does/not/exist"))
     return client, AsyncTransport(client, auth)
+
+
+def test_query_parameters_are_bound_values_and_legacy_calls_are_unchanged() -> None:
+    bodies: list[object] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/auth/credential":
+            return session()
+        bodies.append(json.loads(request.content))
+        return response({"rows": [{"answer": 42}]})
+
+    params = ("한글 ' \\ 😀 ?; DROP TABLE notes;", None, True, False, 1.5, 42, "9007199254740993", "0.00000000000000000001")
+    sql = "SELECT " + ", ".join("?" for _ in params)
+    client, transport = sync_stack(handler)
+    with client:
+        database = Databases(transport)
+        assert database.query("db", sql, params=params) == {"rows": [{"answer": 42}]}
+        database.query("db", "SELECT '?'", params=[])
+        database.query("db", "SELECT 1")
+    assert bodies == [{"query": sql, "params": list(params)}, {"query": "SELECT '?'", "params": []}, {"query": "SELECT 1"}]
+
+
+async def test_async_query_parameters_and_validation_before_authentication() -> None:
+    bodies: list[object] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/auth/credential":
+            return session()
+        bodies.append(json.loads(request.content))
+        return response({"rows": [{"answer": 42}]})
+
+    client, transport = async_stack(handler)
+    async with client:
+        database = AsyncDatabases(transport)
+        assert await database.query("db", "SELECT ?", params=["O'Reilly 😀"]) == {"rows": [{"answer": 42}]}
+        await database.query("db", "SELECT 1")
+    assert bodies == [{"query": "SELECT ?", "params": ["O'Reilly 😀"]}, {"query": "SELECT 1"}]
+
+    def forbidden(_request: httpx.Request) -> httpx.Response:
+        pytest.fail("invalid input must not cause network I/O")
+
+    invalid: list[Any] = [
+        "secret-value",
+        b"secret-value",
+        {},
+        [object()],
+        [float("nan")],
+        [float("inf")],
+        [2**53],
+        [[1]],
+        [{"secret": "value"}],
+    ]
+    sync_client, sync_transport = sync_stack(forbidden)
+    async_client, async_transport = async_stack(forbidden)
+    with sync_client:
+        async with async_client:
+            for params in invalid:
+                with pytest.raises(JustDeployValidationError) as caught:
+                    Databases(sync_transport).query("db", "SELECT ?", params=params)
+                assert "secret" not in str(caught.value)
+                with pytest.raises(JustDeployValidationError):
+                    await AsyncDatabases(async_transport).query("db", "SELECT ?", params=params)
+
+
+@pytest.mark.parametrize("phase", ["auth", "api", "upload", "download"])
+def test_timeout_reports_stage_without_leaking_request(phase: str) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if phase != "auth" and request.url.path == "/auth/credential":
+            return session()
+        raise httpx.ReadTimeout("secret-url-and-body", request=request)
+
+    client, transport = sync_stack(handler)
+    with client, pytest.raises(JustDeployError) as caught:
+        if phase == "upload":
+            transport.presigned_upload("https://files.example.test/file", mime="text/plain", data=b"x", size=1)
+        elif phase == "download":
+            transport.presigned_download("https://files.example.test/file")
+        else:
+            transport.organization_request("POST", "/mails", json_body={})
+    subject = "authentication" if phase == "auth" else "API request" if phase == "api" else "file transfer"
+    assert subject in str(caught.value)
+    assert "timed out" in str(caught.value)
+    assert "secret" not in str(caught.value)
+    if phase == "auth":
+        assert isinstance(caught.value, JustDeployAuthenticationError)
+
+
+@pytest.mark.parametrize("phase", ["auth", "api", "upload", "download"])
+async def test_async_timeout_reports_stage_and_cancellation_is_preserved(phase: str) -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if phase != "auth" and request.url.path == "/auth/credential":
+            return session()
+        raise httpx.ReadTimeout("secret-url-and-body", request=request)
+
+    client, transport = async_stack(handler)
+    async with client:
+        with pytest.raises(JustDeployError, match="timed out") as caught:
+            if phase == "upload":
+                await transport.presigned_upload("https://files.example.test/file", mime="text/plain", data=b"x", size=1)
+            elif phase == "download":
+                await transport.presigned_download("https://files.example.test/file")
+            else:
+                await transport.organization_request("POST", "/mails", json_body={})
+    subject = "authentication" if phase == "auth" else "API request" if phase == "api" else "file transfer"
+    assert subject in str(caught.value)
+    assert "secret" not in str(caught.value)
+
+    async def canceled_handler(_request: httpx.Request) -> httpx.Response:
+        raise asyncio.CancelledError
+
+    canceled_client, canceled_transport = async_stack(canceled_handler)
+    async with canceled_client:
+        with pytest.raises(asyncio.CancelledError):
+            if phase == "upload":
+                await canceled_transport.presigned_upload("https://files.example.test/file", mime="text/plain", data=b"x", size=1)
+            elif phase == "download":
+                await canceled_transport.presigned_download("https://files.example.test/file")
+            else:
+                await canceled_transport.organization_request("POST", "/mails")
 
 
 def test_public_clients_construct_without_network_io() -> None:
@@ -97,7 +217,7 @@ def test_credential_exchange_and_data_session_headers() -> None:
     assert json.loads(requests[0].content) == {}
     assert str(requests[1].url) == f"{API}/organizations/{ORG}/databases"
     assert requests[1].headers["authorization"] == "Bearer session-token"
-    assert requests[1].headers["x-justdeploy-sdk"] == "python/0.1.1"
+    assert requests[1].headers["x-justdeploy-sdk"] == f"python/{__version__}"
 
 
 @pytest.mark.parametrize(
@@ -354,6 +474,69 @@ async def test_async_database_and_mail_surface_matches_sync() -> None:
             )
         )["id"] == "mail-id"
     assert [request.method for request in requests] == ["POST", "POST", "POST"]
+
+
+@pytest.mark.parametrize("use_async", [False, True])
+async def test_browser_upload_preparation_returns_only_permission_and_never_transfers_bytes(use_async: bool) -> None:
+    requests: list[httpx.Request] = []
+    url = "https://files.example.test/upload?signature=private"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/auth/credential":
+            return session()
+        requests.append(request)
+        return response({"files": [{"id": f"file-{len(requests)}", "url": url, "expiresAt": EXPIRY, "unexpected": "not-for-browser"}]}, 201)
+
+    if use_async:
+        client, transport = async_stack(handler)
+        async with client:
+            first = await AsyncStorages(transport).create_upload_url("storage-id", name="image.jpg", mime="image/jpeg")
+            second = await AsyncStorages(transport).create_upload_url("storage-id", name="image.jpg", mime="image/jpeg")
+    else:
+        sync_client, sync_transport = sync_stack(handler)
+        with sync_client:
+            first = Storages(sync_transport).create_upload_url("storage-id", name="image.jpg", mime="image/jpeg")
+            second = Storages(sync_transport).create_upload_url("storage-id", name="image.jpg", mime="image/jpeg")
+    assert first == {"fileId": "file-1", "url": url, "method": "PUT", "headers": {"content-type": "image/jpeg"}, "expiresAt": EXPIRY}
+    assert second["fileId"] == "file-2"
+    assert len(requests) == 2
+    for request in requests:
+        assert str(request.url) == f"{API}/organizations/{ORG}/storages/storage-id/files"
+        assert request.method == "POST"
+        assert json.loads(request.content) == {"files": [{"name": "image.jpg", "mime": "image/jpeg"}]}
+
+
+@pytest.mark.parametrize("use_async", [False, True])
+async def test_browser_upload_does_not_guess_expiry_or_retry_preparation(use_async: bool) -> None:
+    payload: object
+    for payload, status in [
+        (None, 200),
+        ({"files": []}, 200),
+        ({"files": [{"id": "f", "url": "https://files.example.test/secret"}]}, 201),
+        ({"files": [{"id": "f", "url": "https://files.example.test/secret", "expiresAt": "bad"}]}, 201),
+        ({"message": "expired"}, 401),
+    ]:
+        calls: list[httpx.Request] = []
+
+        def handler(
+            request: httpx.Request, *, _calls: list[httpx.Request] = calls, _payload: object = payload, _status: int = status
+        ) -> httpx.Response:
+            if request.url.path == "/auth/credential":
+                return session()
+            _calls.append(request)
+            return response(_payload, _status)
+
+        with pytest.raises(JustDeployError) as caught:
+            if use_async:
+                client, transport = async_stack(handler)
+                async with client:
+                    await AsyncStorages(transport).create_upload_url("storage", name="file", mime="text/plain")
+            else:
+                sync_client, sync_transport = sync_stack(handler)
+                with sync_client:
+                    Storages(sync_transport).create_upload_url("storage", name="file", mime="text/plain")
+        assert len(calls) == 1
+        assert "secret" not in str(caught.value)
 
 
 def test_presigned_transfers_never_receive_justdeploy_authentication() -> None:
