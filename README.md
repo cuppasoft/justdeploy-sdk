@@ -4,7 +4,7 @@ Official server-side SDKs for [JustDeploy](https://justdeploy.ai).
 
 > Version `0.2.0` is available on [npm](https://www.npmjs.com/package/@justdeploy/sdk/v/0.2.0) and [PyPI](https://pypi.org/project/justdeploy-sdk/0.2.0/).
 >
-> Production supports SDK authentication. Local applications use Credential environment variables; deployed web, API, and cron applications can use automatic identity. Development remains limited to Playground.
+> The current release is supported in Production, including bound query values and browser-direct upload preparation. Local applications use Credential environment variables; deployed web, API, and cron applications can use automatic identity. Development remains limited to Playground.
 
 ## Supported runtimes
 
@@ -24,6 +24,8 @@ npm install @justdeploy/sdk@0.2.0
 ```bash
 python -m pip install justdeploy-sdk==0.2.0
 ```
+
+Publishing the SDK does not update dependencies inside existing deployed apps. Existing SDK calls remain supported. To use the new methods, update your app's dependency declaration and any lockfile to `0.2.0`, then deploy that source. Keep working authentication unchanged.
 
 ## Quick start
 
@@ -142,7 +144,7 @@ gh workflow run publish.yml --repo cuppasoft/justdeploy-sdk --ref main \
 
 The workflow checks all five supported runtimes, validates versions and package contents, and keeps the three archives plus their SHA-256 checksums as a release artifact. The publishing jobs use those exact archives and authenticate through GitHub; no registry token or routine browser confirmation is needed. A final check downloads all three public files without authentication and compares their checksums.
 
-After a partial failure, inspect what is already public and rerun only the failed jobs. Do not overwrite or delete an existing version, or restart a successful npm publish. If a published release has a defect, obtain approval to deprecate it on npm or yank it on PyPI, then publish a new patch version. After both registries pass verification, clean-install by public package name, then update this README, example pins, and Development guides together.
+After a partial failure, inspect what is already public and rerun only the failed jobs. Do not overwrite or delete an existing version, or restart a successful npm publish. If a published release has a defect, obtain approval to deprecate it on npm or yank it on PyPI, then publish a new patch version. After both registries pass verification, clean-install by public package name, then update this README, example pins, and the served guides and web documentation for the approved stages together.
 
 ## License
 

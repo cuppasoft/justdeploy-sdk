@@ -1,6 +1,6 @@
 # SDK release checklist
 
-Use this checklist for each release. Commands and publishing setup are in [README.md](../README.md#publishing-operator-only). Published archives are immutable; current source documentation may be newer than the README inside an archive.
+This is a reusable checklist for future releases, not unfinished work for the current release. The published version and Production availability are in [README.md](../README.md); commands and publishing setup are in [Publishing](../README.md#publishing-operator-only). Published archives are immutable; current source documentation may be newer than the README inside an archive.
 
 ## Candidate checks
 
@@ -21,13 +21,11 @@ Use this checklist for each release. Commands and publishing setup are in [READM
 - [ ] Run the manual workflow in prepare-only mode and inspect its archives and checksums.
 - [ ] Publish those exact archives from the same reviewed commit using GitHub Trusted Publishing. Do not add stored registry tokens or automatic push/tag/release triggers.
 - [ ] Verify anonymous downloads against all three reviewed archive checksums; clean-install by public package name on every supported runtime.
-- [ ] Update README versions, example dependency pins and Development guides together; verify actual served guides.
+- [ ] Update README versions, example dependency pins, and the served guides and web documentation for the approved stages together; verify actual responses.
 - [ ] After a partial failure, inspect existing publications and retry only failed jobs. Never overwrite an existing version or repeat a successful npm publish.
 
 ## Server rollout
 
-Production rollout is separately approved and tracked in the server repository's `docs/specs/ops.md`. Use its preflight, migration and recovery procedure; package publication is not evidence that the server rollout succeeded.
+For a version that requires server changes, obtain separate Production approval and verify the server and platform-owned Storage prerequisites before publication. The publishing workflow does not deploy the server. Do not roll back to a server that cannot support an already published SDK.
 
-The current baseline is SDK `0.2.0`, with Production support for bound query values, browser-direct upload preparation, local Credentials and deployed web/API/cron identities. Development authentication remains limited to Playground. Server support and platform-owned Storage CORS must be in place before advertising these methods; do not roll back to a server that cannot support the published SDK.
-
-The operator confirmed receipt of an SDK-sent Production email. Production Mail idempotency and the server record's `delivered` status remain unverified; they are tracked in the server's `docs/proposals/misc-roadmap.md`. Any additional send requires separate approval. Production Database sampling was read-only, not a full CRUD/DDL test.
+Current server deployment, verified scope and recovery rules belong in the server repository's [operations spec](https://github.com/cuppasoft/justdeploy-server/blob/main/docs/specs/ops.md#sdkfirewall-운영-전환). Outstanding operational checks belong in its [roadmap](https://github.com/cuppasoft/justdeploy-server/blob/main/docs/proposals/misc-roadmap.md), not in this reusable checklist.
