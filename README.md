@@ -4,7 +4,7 @@ Official server-side SDKs for [JustDeploy](https://justdeploy.ai).
 
 > Version `0.1.1` was published to [npm](https://www.npmjs.com/package/@justdeploy/sdk/v/0.1.1) and [PyPI](https://pypi.org/project/justdeploy-sdk/0.1.1/) on 2026-09-04 through GitHub Trusted Publishing. Package availability and Production authentication rollout are separate milestones.
 >
-> SDK authentication is currently enabled only for deployed projects in the Development Playground. A local client with Credential environment variables connects to Production, and Production SDK authentication is not enabled yet. Both paths will be announced only after the separate Production rollout.
+> Production SDK authentication is enabled as of 2026-09-04. Local applications use Credential environment variables; deployed web, API, and cron applications can use automatic identity. Development remains limited to Playground.
 
 Version `0.1.1` fixes Python 3.14 method inspection and reports the transferred byte size immediately after a successful upload.
 
@@ -27,11 +27,9 @@ npm install @justdeploy/sdk@0.1.1
 python -m pip install justdeploy-sdk==0.1.1
 ```
 
-## Quick start (after Production rollout)
+## Quick start
 
-The examples below use `0.1.1`. They are not a usable local setup until the Production authentication rollout is announced; today, only an application deployed in the Development Playground can exercise the automatic identity path.
-
-After that rollout, local development uses a Credential from the JustDeploy console:
+The examples below use `0.1.1`. For local development, use a Credential from the Production JustDeploy console and resource IDs from that same organization:
 
 ```bash
 export JUSTDEPLOY_ACCESS_KEY="<access-key>"
@@ -40,7 +38,7 @@ export JUSTDEPLOY_SECRET_KEY="<secret-key>"
 
 Do not put those values in source code or include a local `.env` file in a deployment. The SDK itself does not read `.env` files.
 
-In a deployed JustDeploy application, use the same argument-free client without setting either variable. The SDK uses the deployment identity that JustDeploy places in the image. This no-configuration path is currently active only in the Development Playground.
+In a deployed JustDeploy application, use the same argument-free client without setting either variable. The SDK uses the deployment identity that JustDeploy places in the image. This works in Production and the Development Playground. A local client always uses Production; Development Credentials cannot authenticate there.
 
 ```ts
 import { JustDeploy } from '@justdeploy/sdk';

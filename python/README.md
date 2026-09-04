@@ -2,7 +2,7 @@
 
 The official JustDeploy SDK for server-side CPython 3.12, 3.13, and 3.14. Import it as `justdeploy`.
 
-> These examples target SDK 0.1.1. Check the repository README and your JustDeploy guide for publication and authentication availability. During the Development preview, integration tests run in deployed Playground projects; local Credential exchange requires the Production rollout.
+> SDK 0.1.1 is public. Production supports local Credential authentication and automatic identity in deployed web, API, and cron applications. Development SDK access remains limited to Playground.
 
 ## Install
 
@@ -32,7 +32,7 @@ async def read_orders() -> None:
         result = await justdeploy.databases.query("your-database-id", "SELECT * FROM orders")
 ```
 
-After the Production rollout, local development sets both `JUSTDEPLOY_ACCESS_KEY` and `JUSTDEPLOY_SECRET_KEY` in the process environment, while a deployed JustDeploy application needs no SDK configuration. Before that rollout, use a project deployed in the Development Playground. If a deployed application explicitly keeps both variables, the SDK accepts and prioritizes them; build feedback recommends the simpler automatic deployment identity without blocking the build.
+For local development, set both `JUSTDEPLOY_ACCESS_KEY` and `JUSTDEPLOY_SECRET_KEY` in the process environment, using a Production Credential and resource IDs from the same organization. Deployed JustDeploy applications need no SDK configuration. A local client cannot use Development Credentials; test a Development organization in its deployed Playground app. If a deployed application explicitly keeps both variables, the SDK accepts and prioritizes them; build feedback recommends the simpler automatic deployment identity without blocking the build.
 
 ## Database
 

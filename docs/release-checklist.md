@@ -1,6 +1,6 @@
 # SDK release checklist
 
-Stable `0.1.1` was published to npm and PyPI on 2026-09-04 through the approved [GitHub publishing run](https://github.com/cuppasoft/justdeploy-sdk/actions/runs/33831514520). Publishing and Production rollout are separate approval gates.
+Stable `0.1.1` was published to npm and PyPI on 2026-09-04 through the approved [GitHub publishing run](https://github.com/cuppasoft/justdeploy-sdk/actions/runs/33831514520). Production authentication and guides were enabled later that day under separate operator approval. Actual Production mail delivery remains an unperformed follow-up, not a completed check.
 
 ## Development Playground server readiness
 
@@ -14,7 +14,7 @@ Stable `0.1.1` was published to npm and PyPI on 2026-09-04 through the approved 
 
 - [x] Install the packed npm artifact in clean Node.js 22 and 24 directories, covering ESM and CommonJS.
 - [x] Install the built wheel in clean Python 3.12, 3.13, and 3.14 directories, covering sync and async clients.
-- [x] Test Credential exchange against Development with a test-provided Development origin, and test automatic deployed identity exchange. The exact identity-free local path remains in the Production gate below.
+- [x] Test Credential exchange against Development with a test-provided Development origin, and test automatic deployed identity exchange. The exact identity-free local path was subsequently verified in Production below.
 - [x] Test Database DDL and DML, streaming Storage upload/download/delete, and idempotent Mail send/read.
 - [x] Confirm five invalid Storage input cases create no file rows, and a real late upload after cancellation is removed without reviving its record.
 - [x] Confirm another organization is rejected and signed file requests contain no JustDeploy authentication header.
@@ -46,9 +46,7 @@ Stable `0.1.1` was published to npm and PyPI on 2026-09-04 through the approved 
 
 Account GitHub linking is not publishing authorization. These registry settings are a one-time setup; normal approved releases use the manual GitHub workflow. Keep account two-factor authentication enabled and never add push/tag/release publishing triggers.
 
-CI evidence captured on 2026-09-04: documentation-only commit `d95d678` has a [failed run](https://github.com/cuppasoft/justdeploy-sdk/actions/runs/33833483673). The version check, Node.js 22, and Python 3.12/3.13/3.14 jobs passed. Node.js 24 failed because npm's security-audit endpoint timed out on all three retries; its later type, functional, and packaging checks did not run. This does not replace or invalidate the earlier 114 public-install checks.
-
-Runtime sources and dependency lockfiles are unchanged from the successful publishing commit `726da7c`. This failure is not a vulnerability finding or a successful current audit. Keep the security check enabled and inspect the latest run immediately before Production rollout.
+Pre-rollout CI evidence on 2026-09-04: commit `efcf13d` [passed every job](https://github.com/cuppasoft/justdeploy-sdk/actions/runs/33842439206), including all five supported runtimes and dependency security audits. This resolved the earlier documentation commit's npm audit connection timeout without bypassing the check. Runtime sources and dependency lockfiles remain unchanged from the successful publishing commit `726da7c`.
 
 ## Completed 0.1.0 publishing gate
 
@@ -59,19 +57,23 @@ Runtime sources and dependency lockfiles are unchanged from the successful publi
 - [x] Publish stable `0.1.0` to npm and PyPI only after explicit operator approval.
 - [x] Confirm npm public visibility and download all three published archives without authentication; their bytes match the reviewed release files.
 
-## Production gate
+## Production rollout — 2026-09-04
 
 - [x] Complete public-package Development Playground guide validation and record the remaining publication/Production gates.
 - [x] Prepare the server's Production-enabled release source and test both stage branches; Development remains limited to Playground. Deploy the same source to Development without touching live Production functions.
 - [x] Run the server's read-only Production preflight: both DDLs, six IAM policies, ten platform functions, fifteen current customer builds, original-source availability, and rollback archives. Repeat it immediately before rollout.
-- [ ] Pass the latest SDK CI, including the dependency security audit, without bypassing a failed or unavailable check.
-- [ ] Enable Production SDK permissions and guides only after separate explicit operator approval.
-- [ ] Include Storage's failed-upload cleanup and edge attachment in the coordinated server rollout; do not deploy only authentication and guides.
-- [ ] Immediately test an identity-free local client with only the two Credential environment variables. This exact path cannot target the Development API because the SDK intentionally has no API URL setting.
-- [ ] After that short local check passes, refresh every existing Production application in parallel within available capacity. Rebuild available sources; for source-less applications already using current identity images, reapply the same image and verify a new execution revision. Missing source is not rebuilt or recovered.
-- [ ] Check basic readiness and baseline responses for every application, then perform detailed post-rollout sampling: rebuilt web, API, and source-less web, including a custom domain. Preserve build health checks and automatic rollback.
-- [ ] Verify public 0.1.1 automatic authentication and Database, Storage, and Mail in operator-owned Node web and Python cron test applications. Customer rebuilds do not add SDK usage or cover Python/cron. Use only isolated test data and the designated test recipient; test Firewall rejection only on the test web application.
-- [ ] Check representative Production API/Console guides and actual Storage delivery. Restore failed applications, or the platform and affected applications for a shared failure, using the saved rollback artifacts before declaring completion.
-- [ ] After all checks pass, clean exactly identified legacy temporary build archives and resources created for this test. Preserve original source, rollback material, manual Credentials, and guide keys.
+- [x] Pass the latest SDK CI, including the dependency security audit, without bypassing a failed or unavailable check.
+- [x] Enable Production SDK permissions and guides after separate explicit operator approval.
+- [x] Deploy Storage's failed-upload cleanup and attach the new edge version; verify propagation and actual download bytes. Invoke both Credential and Storage cleanup jobs successfully.
+- [x] Test identity-free Node.js and Python clients with only the two Credential environment variables: authentication and SQL reads succeed; an invalid key is rejected with 401.
+- [x] Refresh all fifteen existing Production applications after the local check: twelve normal rebuilds and three same-image refreshes with new execution revisions. Missing source was neither rebuilt nor recovered.
+- [x] Check readiness, baseline responses, policy loading, and absence of identity errors for all fifteen applications. Verify six default/custom-domain endpoints across rebuilt web, API, and source-less web representatives.
+- [x] Verify public 0.1.1 automatic authentication in operator-owned Node web and Python cron apps with no Credential environment variables. Verify SQL reads, bytes/stream upload, immediate size, matching download bytes, deletion, and cross-organization rejection. The cron receives identity without Firewall; test-web Firewall rejection and restoration returned 403 then 200.
+- [x] Check eight representative Production API/Console guides. Correct the stale Development availability notice, deploy both Development guide servers, and verify fourteen actual responses.
+- [x] Recheck five existing Production Node web applications without changing their code or configuration: 42 HTTP/file/access checks and successful SDK authentication against Production from each exact deployment image. Existing direct-Credential applications still work; this isolated image check does not imply that their source adopted the SDK or that it covers Python/cron.
+- [x] Delete the 466 exactly matched legacy temporary build archives, retaining twelve original sources and rollback material. Delete the two test applications and the temporary verification Credential; customer keys remain intact. Follow-up checks confirmed that asynchronous cleanup also removed both remaining test network resources.
+- [ ] Send an approved Production test email and verify idempotency plus actual delivery. Only Mail listing and invalid-sender rejection were exercised in Production; no email has been sent for this check.
 
-Publishing 0.1.1 does not enable Production authentication. The server rollout remains a separate explicit approval. The canonical target inventory, deployment order, stop conditions, and recovery procedure are in the server repository's `docs/proposals/sdk.md`; this checklist does not define a second rollout plan. Completed Development simulations and the 114 public-install checks need not be rerun in Production.
+Database CRUD/DDL and actual Mail delivery were verified in Development, not repeated in Production. Production Database sampling deliberately remained read-only and did not modify customer data or schema. Do not describe these narrower checks as a full Production CRUD/Mail pass.
+
+The server repository's `docs/proposals/sdk.md` records the canonical target inventory, deployed source, verification scope, and recovery procedure. Completed Development simulations and the 114 public-install checks were not repeated in Production. This documentation update does not publish new archives; the immutable 0.1.1 registry files retain their publication-time README.

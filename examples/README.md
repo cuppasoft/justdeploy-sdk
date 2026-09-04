@@ -1,6 +1,6 @@
 # Examples
 
-These examples use placeholders and contain no Credential. Authentication is currently enabled only for projects deployed in the Development Playground. After the separate Production rollout, local use will set both `JUSTDEPLOY_ACCESS_KEY` and `JUSTDEPLOY_SECRET_KEY` in the process environment and replace the resource IDs. Do not copy a Credential into an example or commit a local `.env` file.
+These examples use placeholders and contain no Credential. Production and deployed Development Playground apps support automatic authentication. For local use, set both `JUSTDEPLOY_ACCESS_KEY` and `JUSTDEPLOY_SECRET_KEY` in the process environment using a Production Credential, and replace the resource IDs with IDs from that same organization. Local clients cannot use Development Credentials. Do not copy a Credential into an example or commit a local `.env` file.
 
 Install the published `0.1.1` package using the [JavaScript](../javascript/README.md) or [Python](../python/README.md) instructions.
 
