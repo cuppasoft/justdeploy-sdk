@@ -28,7 +28,7 @@ Stable `0.1.1` was published to npm and PyPI on 2026-09-04 through the approved 
 
 - [x] Both language versions are 0.1.1; successful uploads return their transferred byte size without an extra API call.
 - [x] Python 3.14 can inspect all public resource-list method annotations.
-- [x] Node.js 22/24: 15 tests each plus TypeScript checks; Python 3.12/3.13/3.14: 28 tests each using the built wheel. Linters and dependency audits pass.
+- [x] At the approved 0.1.1 release gate, Node.js 22/24 passed 15 tests each plus TypeScript checks, and Python 3.12/3.13/3.14 passed 28 tests each using the built wheel. Linters and dependency audits also passed. Subsequent CI results are recorded separately below.
 - [x] Deploy the candidate archives through normal Development CI/CD and test Node plus Python 3.14 sync/async automatic authentication, exact immediate upload sizes, stream transfers, byte comparison, and deletion.
 - [x] Verify the real Development API/Console guides and fresh build analysis; normal SDK construction no longer produces a manual-Credential requirement.
 - [x] Review npm/wheel/sdist license, types, file lists, and absence of credentials and identity files.
@@ -46,7 +46,9 @@ Stable `0.1.1` was published to npm and PyPI on 2026-09-04 through the approved 
 
 Account GitHub linking is not publishing authorization. These registry settings are a one-time setup; normal approved releases use the manual GitHub workflow. Keep account two-factor authentication enabled and never add push/tag/release publishing triggers.
 
-The subsequent documentation-only commit `30a339e` also has a [failed CI run](https://github.com/cuppasoft/justdeploy-sdk/actions/runs/33832906811): npm's security-audit endpoint timed out on all three retries. Runtime sources and dependency lockfiles are unchanged from the successful publishing commit `726da7c`. This is not a vulnerability finding or a successful current audit; keep the security check enabled and recheck before Production rollout.
+CI evidence captured on 2026-09-04: documentation-only commit `d95d678` has a [failed run](https://github.com/cuppasoft/justdeploy-sdk/actions/runs/33833483673). The version check, Node.js 22, and Python 3.12/3.13/3.14 jobs passed. Node.js 24 failed because npm's security-audit endpoint timed out on all three retries; its later type, functional, and packaging checks did not run. This does not replace or invalidate the earlier 114 public-install checks.
+
+Runtime sources and dependency lockfiles are unchanged from the successful publishing commit `726da7c`. This failure is not a vulnerability finding or a successful current audit. Keep the security check enabled and inspect the latest run immediately before Production rollout.
 
 ## Completed 0.1.0 publishing gate
 
