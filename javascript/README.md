@@ -116,6 +116,10 @@ Upload results have no signed URL. `file.size` is the number of bytes successful
 
 For pagination, pass `page.nextCursor` as the next call's `cursor` until it is null.
 
+Transfer failures are safe SDK errors, not unchanged exceptions from your byte source. Failed uploads try to remove the pending record; cleanup failure does not replace the transfer error or cancellation.
+
+A successful delete accepts the deletion. GET/list metadata may update later; an immediate stale read does not make the delete a failure. For cleanup verification, recheck the same ID after a short delay.
+
 ## Mail
 
 ```ts
