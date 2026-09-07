@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Security fixes target the latest published version, currently `0.1.1`. Upgrade older versions before reporting a problem that the latest release already fixes.
+Security fixes target the latest published version listed in the [README](README.md). Upgrade older versions before reporting a problem that the latest release already fixes.
 
 ## Reporting a vulnerability
 
