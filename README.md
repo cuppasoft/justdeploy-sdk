@@ -2,7 +2,7 @@
 
 Official server-side SDKs for [JustDeploy](https://justdeploy.ai).
 
-> Version `0.2.1` is available on [npm](https://www.npmjs.com/package/@justdeploy/sdk/v/0.2.1) and [PyPI](https://pypi.org/project/justdeploy-sdk/0.2.1/).
+> Version `0.2.2` is available on [npm](https://www.npmjs.com/package/@justdeploy/sdk/v/0.2.2) and [PyPI](https://pypi.org/project/justdeploy-sdk/0.2.2/).
 >
 > The current release is supported in Production, including bound query values and browser-direct upload preparation. Local applications use Credential environment variables; deployed web, API, and cron applications can use automatic identity. Development remains limited to Playground.
 
@@ -18,14 +18,14 @@ Both packages cover Database, Storage, and Mail. They are for server application
 ## Install
 
 ```bash
-npm install @justdeploy/sdk@0.2.1
+npm install @justdeploy/sdk@0.2.2
 ```
 
 ```bash
-python -m pip install justdeploy-sdk==0.2.1
+python -m pip install justdeploy-sdk==0.2.2
 ```
 
-Publishing the SDK does not update dependencies inside existing deployed apps. Existing SDK calls remain supported. To use the new version, update your app's dependency declaration and any lockfile to `0.2.1`, then deploy that source. Keep working authentication unchanged.
+Publishing the SDK does not update dependencies inside existing deployed apps. Existing SDK calls remain supported. To use the new version, update your app's dependency declaration and any lockfile to `0.2.2`, then deploy that source. Keep working authentication unchanged.
 
 ## Quick start
 
