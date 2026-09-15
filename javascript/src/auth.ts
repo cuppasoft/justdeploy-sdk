@@ -1,6 +1,7 @@
 import { createPrivateKey, sign } from 'node:crypto';
 import { closeSync, constants, fstatSync, lstatSync, openSync, readSync } from 'node:fs';
 import { JustDeployAuthenticationError, JustDeployConfigurationError } from './errors.js';
+import { responseDetails } from './response.js';
 import { SDK_HEADER } from './version.js';
 
 const DEFAULT_API_ORIGIN = 'https://api.justdeploy.net';
@@ -140,12 +141,7 @@ async function authenticationError(response: Response): Promise<JustDeployAuthen
     // The status and request id still make a non-JSON rejection actionable.
   }
   const message = typeof details.message === 'string' && details.message.length > 0 ? details.message : 'JustDeploy authentication was rejected.';
-  return new JustDeployAuthenticationError(message, {
-    status: response.status,
-    retryAfter: typeof details.retryAfter === 'number' ? details.retryAfter : null,
-    requestId: typeof details.requestId === 'string' ? details.requestId : (response.headers.get('x-request-id') ?? null),
-    details,
-  });
+  return new JustDeployAuthenticationError(message, responseDetails(response, details));
 }
 
 export class AuthManager {
@@ -290,10 +286,7 @@ export class AuthManager {
     try {
       payload = (await response.json()) as typeof payload;
     } catch {
-      throw new JustDeployAuthenticationError(timeout.aborted ? 'JustDeploy authentication timed out.' : 'JustDeploy returned an invalid authentication response.', {
-        status: response.status,
-        requestId: response.headers.get('x-request-id'),
-      });
+      throw new JustDeployAuthenticationError(timeout.aborted ? 'JustDeploy authentication timed out.' : 'JustDeploy returned an invalid authentication response.', responseDetails(response));
     }
     const expiresAt = typeof payload?.expiresAt === 'string' && ISO_TIMESTAMP.test(payload.expiresAt) ? Date.parse(payload.expiresAt) : Number.NaN;
     if (
@@ -304,10 +297,7 @@ export class AuthManager {
       !Number.isFinite(expiresAt) ||
       expiresAt <= this.now()
     ) {
-      throw new JustDeployAuthenticationError('JustDeploy returned an invalid authentication response.', {
-        status: response.status,
-        requestId: response.headers.get('x-request-id'),
-      });
+      throw new JustDeployAuthenticationError('JustDeploy returned an invalid authentication response.', responseDetails(response));
     }
 
     return { token: payload.token, organizationId: payload.organizationId, expiresAt, apiOrigin };

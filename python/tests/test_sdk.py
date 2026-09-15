@@ -177,6 +177,76 @@ async def test_async_timeout_reports_stage_and_cancellation_is_preserved(phase: 
                 await canceled_transport.organization_request("POST", "/mails")
 
 
+@pytest.mark.parametrize("phase", ["auth", "api"])
+async def test_error_metadata_matches_sync_and_async_and_never_retries(phase: str) -> None:
+    cases: list[tuple[dict[str, object], dict[str, str], int | None, str | None]] = [
+        ({"retryAfter": 7, "requestId": "body-request"}, {"retry-after": "11", "x-request-id": "header-request"}, 7, "body-request"),
+        ({}, {"retry-after": "11", "x-request-id": "header-request"}, 11, "header-request"),
+        ({"retryAfter": 7.0}, {}, 7, None),
+        ({"retryAfter": None, "requestId": ""}, {"retry-after": "0002", "x-request-id": "valid_ID-1"}, 2, "valid_ID-1"),
+    ]
+    for invalid in [0, -1, 1.5, True, "7", 2**53, 10**400, float("nan"), float("inf")]:
+        cases.append(
+            (
+                {"retryAfter": invalid, "requestId": "unsafe\n"},
+                {"retry-after": "11", "x-request-id": "header-request"},
+                11,
+                "header-request",
+            )
+        )
+    for delay in ["0", "-1", "1.5", "1e2", "9007199254740992", "Tue, 15 Sep 2026 00:00:00 GMT", "9" * 5000]:
+        cases.append(({"requestId": "x" * 129}, {"retry-after": delay, "x-request-id": "not a request id"}, None, None))
+
+    for payload, headers, delay_value, request_id in cases:
+        attempts = 0
+
+        def handler(request: httpx.Request, payload: dict[str, object] = payload, headers: dict[str, str] = headers) -> httpx.Response:
+            nonlocal attempts
+            if phase == "api" and request.url.path == "/auth/credential":
+                return session()
+            attempts += 1
+            # Include malformed JSON numbers to verify defensive parsing of external responses.
+            return httpx.Response(503, content=json.dumps({"message": "Try later", **payload}), headers=headers)
+
+        sync_client, sync_transport = sync_stack(handler)
+        async_client, async_transport = async_stack(handler)
+        with sync_client, pytest.raises(JustDeployError) as sync_caught:
+            sync_transport.organization_request("POST", "/mails", json_body={"subject": "private subject"})
+        async with async_client:
+            with pytest.raises(JustDeployError) as async_caught:
+                await async_transport.organization_request("POST", "/mails", json_body={"subject": "private subject"})
+        for error in [sync_caught.value, async_caught.value]:
+            if phase == "auth":
+                assert isinstance(error, JustDeployAuthenticationError)
+            assert error.status == 503
+            assert error.retry_after == delay_value
+            assert error.request_id == request_id
+            assert str(error) == "Try later"
+            assert "private subject" not in str(error.details)
+        assert attempts == 2
+
+
+@pytest.mark.parametrize("phase", ["auth", "api"])
+async def test_non_json_errors_preserve_safe_header_diagnostics(phase: str) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if phase == "api" and request.url.path == "/auth/credential":
+            return session()
+        return httpx.Response(503, text="private gateway response", headers={"retry-after": "4", "x-request-id": "gateway-request"})
+
+    sync_client, sync_transport = sync_stack(handler)
+    async_client, async_transport = async_stack(handler)
+    with sync_client, pytest.raises(JustDeployError) as sync_caught:
+        sync_transport.organization_request("POST", "/mails")
+    async with async_client:
+        with pytest.raises(JustDeployError) as async_caught:
+            await async_transport.organization_request("POST", "/mails")
+    for error in [sync_caught.value, async_caught.value]:
+        assert error.status == 503
+        assert error.retry_after == 4
+        assert error.request_id == "gateway-request"
+        assert "private" not in str(error)
+
+
 def test_public_clients_construct_without_network_io() -> None:
     with JustDeploy() as client:
         assert client.databases

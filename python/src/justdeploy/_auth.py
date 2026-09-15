@@ -20,6 +20,7 @@ from cryptography.exceptions import UnsupportedAlgorithm
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import load_der_private_key
 
+from ._response import error_metadata
 from ._version import __version__
 from .errors import JustDeployAuthenticationError, JustDeployConfigurationError
 
@@ -206,15 +207,7 @@ def _session_from_response(response: httpx.Response, api_origin: str, now: float
                     message = payload["message"]
         except (ValueError, UnicodeDecodeError):
             pass
-        retry_after = details.get("retryAfter")
-        request_id = details.get("requestId")
-        raise JustDeployAuthenticationError(
-            message,
-            status=response.status_code,
-            retry_after=retry_after if isinstance(retry_after, int) and not isinstance(retry_after, bool) else None,
-            request_id=request_id if isinstance(request_id, str) else response.headers.get("x-request-id"),
-            details=details,
-        )
+        raise JustDeployAuthenticationError(message, **error_metadata(response, details))
     try:
         payload = response.json()
         token = payload["token"]
@@ -229,8 +222,7 @@ def _session_from_response(response: httpx.Response, api_origin: str, now: float
     except (KeyError, TypeError, ValueError, UnicodeDecodeError):
         raise JustDeployAuthenticationError(
             "JustDeploy returned an invalid authentication response.",
-            status=response.status_code,
-            request_id=response.headers.get("x-request-id"),
+            **error_metadata(response),
         ) from None
     if (
         not isinstance(token, str)
@@ -241,8 +233,7 @@ def _session_from_response(response: httpx.Response, api_origin: str, now: float
     ):
         raise JustDeployAuthenticationError(
             "JustDeploy returned an invalid authentication response.",
-            status=response.status_code,
-            request_id=response.headers.get("x-request-id"),
+            **error_metadata(response),
         )
     return AuthSession(token, organization_id, expires_at, api_origin)
 

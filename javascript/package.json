@@ -1,6 +1,6 @@
 {
   "name": "@justdeploy/sdk",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Official server-side JavaScript and TypeScript SDK for JustDeploy",
   "license": "Apache-2.0",
   "author": "CUPPASOFT LTD",
@@ -50,7 +50,7 @@
     "pack:check": "npm run build && npm pack --dry-run"
   },
   "devDependencies": {
-    "@types/node": "^24.3.0",
+    "@types/node": "^24.13.4",
     "typescript": "^5.9.2"
   },
   "publishConfig": {

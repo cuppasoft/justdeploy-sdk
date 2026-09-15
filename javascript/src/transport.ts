@@ -1,5 +1,6 @@
 import { AuthManager, type AuthSession } from './auth.js';
 import { JustDeployError, JustDeployValidationError } from './errors.js';
+import { responseDetails } from './response.js';
 import type { RequestOptions } from './types.js';
 import { SDK_HEADER } from './version.js';
 
@@ -19,7 +20,7 @@ function interruptionMessage(signal: AbortSignal | null | undefined, subject: st
 }
 
 async function responsePayload(response: Response, signal: AbortSignal): Promise<unknown> {
-  const details = { status: response.status, requestId: response.headers.get('x-request-id') };
+  const details = responseDetails(response);
   let text: string;
   try {
     text = await response.text();
@@ -39,12 +40,7 @@ async function responsePayload(response: Response, signal: AbortSignal): Promise
 function apiError(response: Response, payload: unknown): JustDeployError {
   const details = payload && typeof payload === 'object' && !Array.isArray(payload) ? (payload as Record<string, unknown>) : {};
   const message = typeof details.message === 'string' && details.message.length > 0 ? details.message : `JustDeploy request failed with status ${response.status}.`;
-  return new JustDeployError(message, {
-    status: response.status,
-    retryAfter: typeof details.retryAfter === 'number' ? details.retryAfter : null,
-    requestId: typeof details.requestId === 'string' ? details.requestId : (response.headers.get('x-request-id') ?? null),
-    details,
-  });
+  return new JustDeployError(message, responseDetails(response, details));
 }
 
 function assertInternalPath(path: string): void {

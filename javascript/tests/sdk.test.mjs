@@ -164,6 +164,55 @@ test('authentication deadlines identify the authentication stage', async (t) => 
   }
 });
 
+test('authentication and API errors validate body metadata and recover headers without retries', async () => {
+  const cases = [
+    [{ retryAfter: 7, requestId: 'body-request' }, { 'retry-after': '11', 'x-request-id': 'header-request' }, 7, 'body-request'],
+    [{}, { 'retry-after': '11', 'x-request-id': 'header-request' }, 11, 'header-request'],
+    ...[0, -1, 1.5, true, '7', 2 ** 53].map(retryAfter => [
+      { retryAfter, requestId: 'unsafe\n' }, { 'retry-after': '11', 'x-request-id': 'header-request' }, 11, 'header-request',
+    ]),
+    ...['0', '-1', '1.5', '1e2', '9007199254740992', 'Tue, 15 Sep 2026 00:00:00 GMT', '9'.repeat(5000)].map(delay => [
+      { requestId: 'x'.repeat(129) }, { 'retry-after': delay, 'x-request-id': 'not a request id' }, null, null,
+    ]),
+    [{ retryAfter: null, requestId: '' }, { 'retry-after': '0002', 'x-request-id': 'valid_ID-1' }, 2, 'valid_ID-1'],
+  ];
+  for (const phase of ['auth', 'api']) {
+    for (const [payload, headers, delay, id] of cases) {
+      let attempts = 0;
+      const transport = credentialStack(async input => {
+        if (phase === 'api' && String(input).endsWith('/auth/credential')) return session();
+        attempts += 1;
+        return json({ message: 'Try later', ...payload }, 503, headers);
+      });
+      await assert.rejects(transport.organizationRequest('POST', '/mails', { body: { subject: 'private subject' } }), error => {
+        assert.ok(error instanceof (phase === 'auth' ? JustDeployAuthenticationError : JustDeployError));
+        assert.equal(error.status, 503);
+        assert.equal(error.retryAfter, delay);
+        assert.equal(error.requestId, id);
+        assert.equal(error.message, 'Try later');
+        assert.doesNotMatch(JSON.stringify(error), /private subject/);
+        return true;
+      });
+      assert.equal(attempts, 1);
+    }
+  }
+});
+
+test('non-JSON authentication and API failures retain header diagnostics without exposing the body', async () => {
+  for (const phase of ['auth', 'api']) {
+    const transport = credentialStack(async input => phase === 'api' && String(input).endsWith('/auth/credential')
+      ? session()
+      : new Response('private gateway response', { status: 503, headers: { 'retry-after': '4', 'x-request-id': 'gateway-request' } }));
+    await assert.rejects(transport.organizationRequest('POST', '/mails'), error => {
+      assert.equal(error.status, 503);
+      assert.equal(error.retryAfter, 4);
+      assert.equal(error.requestId, 'gateway-request');
+      assert.doesNotMatch(error.message, /private/);
+      return true;
+    });
+  }
+});
+
 test('exports work from ESM and CommonJS without doing network I/O', () => {
   assert.equal(typeof JustDeploy, 'function');
   assert.ok(new JustDeploy().databases);

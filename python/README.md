@@ -7,7 +7,7 @@ Production supports local Credential authentication and automatic identity in de
 ## Install
 
 ```bash
-python -m pip install justdeploy-sdk==0.2.1
+python -m pip install justdeploy-sdk==0.2.2
 ```
 
 ## Client
@@ -161,6 +161,8 @@ Use one `idempotency_key` per operation. A retry keeps its key and content; each
 ## Errors and cancellation
 
 Handle SDK failures with `JustDeployError`. API errors expose `status`, `retry_after`, `request_id`, and `details`. For diagnostics, record only `status` and `request_id`, not the whole error, request, SQL, file contents, or credentials. Cancellation does not prove a write was rolled back. Authentication and API time limits are separate; see [request behavior](../README.md#request-behavior).
+
+Authentication and API errors prefer valid JSON diagnostics and fall back to `Retry-After` and `X-Request-Id` headers. `retry_after` is a positive integer in seconds within JavaScript's safe integer range, or `None`; HTTP-date values are not used. `request_id` is a validated identifier, or `None`. Non-JSON errors keep valid header diagnostics without exposing the response body. A delay does not trigger an automatic retry.
 
 Async calls use normal Python task cancellation. Cancel the task with `task.cancel()`; a canceled upload also tries to remove its pending file record. Authentication exchanges have a 10-second timeout; ordinary JustDeploy API requests have a 30-second timeout.
 

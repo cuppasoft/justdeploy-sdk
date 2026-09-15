@@ -7,7 +7,7 @@ Production supports local Credential authentication and automatic identity in de
 ## Install
 
 ```bash
-npm install @justdeploy/sdk@0.2.1
+npm install @justdeploy/sdk@0.2.2
 ```
 
 ## Client
@@ -140,6 +140,8 @@ Use one `idempotencyKey` per operation. A retry keeps its key and content; each 
 ## Errors and cancellation
 
 Handle SDK failures with `JustDeployError`. API errors expose `status`, `retryAfter`, `requestId`, and `details`. For diagnostics, record only `status` and `requestId`, not the whole error, request, SQL, file contents, or credentials. Cancellation does not prove a write was rolled back. Authentication and API time limits are separate; see [request behavior](../README.md#request-behavior).
+
+Authentication and API errors prefer valid JSON diagnostics and fall back to `Retry-After` and `X-Request-Id` headers. `retryAfter` is a positive safe integer in seconds, or `null`; HTTP-date values are not used. `requestId` is a validated identifier, or `null`. Non-JSON errors keep valid header diagnostics without exposing the response body. A delay does not trigger an automatic retry.
 
 Methods that accept request options support an `AbortSignal`:
 

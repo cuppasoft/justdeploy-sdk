@@ -82,6 +82,7 @@ In Production and the Development Playground, sessions can access every External
 
 - Authentication is attached only to SDK-created JustDeploy API requests. Other hosts and presigned Storage upload/download requests never receive the Credential, session token, or SDK header.
 - Authentication exchanges have a 10-second timeout; ordinary JustDeploy API requests have a 30-second timeout. Node.js accepts `AbortSignal`, and Python async calls use normal task cancellation.
+- Authentication and API errors preserve valid JSON diagnostics, falling back to the response headers when fields are missing or invalid. Language-specific field names are in the language guides. A retry delay never triggers a retry by itself.
 - After a 401, only a GET may refresh the session and repeat once. Database queries, Mail sends, and file mutations are never automatically repeated.
 - File transfers stream without collecting the entire file in memory. A transfer that has started is not interrupted just because the session expires. For stream inputs, provide the exact byte count as described in the language guides.
 - A successful upload returns the transferred `size`. Once PUT succeeds, the file can be read without waiting for `active`; metadata may still be `pending`. Before PUT succeeds, `pending` alone does not prove bytes exist. Read again only if final metadata is needed. Failed or canceled uploads try to remove the pending file record. Cleanup failure does not replace the safe SDK transfer error or cancellation; exceptions from the byte source are not returned unchanged.
@@ -120,7 +121,7 @@ uv run pip-audit
 uv build
 ```
 
-The [CI workflow](.github/workflows/ci.yml) audits the shared JavaScript dependency lockfile once, on Node.js 24. That step allows 120 seconds per npm request and at most three audit attempts, with 10 seconds between attempts; other npm steps retain their 30-second request timeout. A high-severity finding or unavailable audit still fails CI and blocks publishing. An audit connection timeout is not a clean security result and does not require registry login. Release gates are in the [release checklist](docs/release-checklist.md).
+The [CI workflow](.github/workflows/ci.yml) owns runtime matrices and audit retry limits. Security findings and unavailable audits block publishing; a timeout is not a clean result. Release gates are in the [release checklist](docs/release-checklist.md).
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) before changing both language surfaces, and report security issues through [SECURITY.md](SECURITY.md).
 

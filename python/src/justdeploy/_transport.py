@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
-from typing import Any, Literal, cast
+from typing import Literal
 from urllib.parse import quote, urlsplit
 
 import httpx
 
 from ._auth import SDK_HEADER, AsyncAuthManager, AuthSession, SyncAuthManager
+from ._response import error_metadata
 from .errors import JustDeployError, JustDeployValidationError
 from .types import AsyncUploadBody, SyncUploadBody
 
@@ -21,17 +22,7 @@ def _api_error(response: httpx.Response, payload: object) -> JustDeployError:
     message = details.get("message")
     if not isinstance(message, str) or not message:
         message = f"JustDeploy request failed with status {response.status_code}."
-    retry_after = details.get("retryAfter")
-    request_id = details.get("requestId")
-    if not isinstance(request_id, str):
-        request_id = response.headers.get("x-request-id")
-    return JustDeployError(
-        message,
-        status=response.status_code,
-        retry_after=retry_after if isinstance(retry_after, int) and not isinstance(retry_after, bool) else None,
-        request_id=request_id,
-        details=cast(Mapping[str, Any], details),
-    )
+    return JustDeployError(message, **error_metadata(response, details))
 
 
 def _payload(response: httpx.Response) -> object:
@@ -42,8 +33,7 @@ def _payload(response: httpx.Response) -> object:
     except (ValueError, UnicodeDecodeError):
         raise JustDeployError(
             "JustDeploy returned a response that was not valid JSON.",
-            status=response.status_code,
-            request_id=response.headers.get("x-request-id"),
+            **error_metadata(response),
         ) from None
 
 
