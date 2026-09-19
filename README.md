@@ -1,6 +1,6 @@
 # JustDeploy SDK
 
-Official server-side SDKs for [JustDeploy](https://justdeploy.ai).
+Official server-side SDKs for [JustDeploy](https://www.justdeploy.ai).
 
 > Version `0.2.2` is available on [npm](https://www.npmjs.com/package/@justdeploy/sdk/v/0.2.2) and [PyPI](https://pypi.org/project/justdeploy-sdk/0.2.2/).
 >
@@ -29,7 +29,7 @@ Publishing the SDK does not update dependencies inside existing deployed apps. E
 
 ## Quick start
 
-For local development, use a Credential from the Production JustDeploy console and resource IDs from that same organization:
+For local development, use a Credential from the [Production Console](https://console.justdeploy.ai) and resource IDs from that same organization:
 
 ```bash
 export JUSTDEPLOY_ACCESS_KEY="<access-key>"

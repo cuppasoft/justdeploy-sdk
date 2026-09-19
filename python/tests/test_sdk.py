@@ -58,7 +58,7 @@ def async_stack(handler: Any) -> tuple[httpx.AsyncClient, AsyncTransport]:
     return client, AsyncTransport(client, auth)
 
 
-def test_query_parameters_are_bound_values_and_legacy_calls_are_unchanged() -> None:
+def test_query_parameters_are_optional_and_values_remain_bound() -> None:
     bodies: list[object] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
