@@ -50,7 +50,7 @@
     "pack:check": "npm run build && npm pack --dry-run"
   },
   "devDependencies": {
-    "@types/node": "^24.13.4",
+    "@types/node": "^26.6.2",
     "typescript": "^5.9.2"
   },
   "publishConfig": {
