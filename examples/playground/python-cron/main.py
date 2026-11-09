@@ -11,67 +11,60 @@ def _upload_chunks() -> Iterator[bytes]:
 
 
 def handler(_event: object, _context: object) -> dict[str, object]:
-    table_name = f"jd_sdk_verify_{uuid.uuid4().hex[:12]}"
     file_id: str | None = None
-    table_created = False
+    row_id: int | None = None
+
+    database_id = os.environ.get("JUSTDEPLOY_DATABASE_ID")
+    storage_id = os.environ.get("JUSTDEPLOY_STORAGE_ID")
+    sender = os.environ.get("SDK_TEST_FROM")
+    if not database_id or not storage_id or not sender:
+        raise RuntimeError(
+            "Set JUSTDEPLOY_DATABASE_ID, JUSTDEPLOY_STORAGE_ID and SDK_TEST_FROM after preparing the Playground resources through MCP."
+        )
 
     with JustDeploy() as justdeploy:
-        databases = justdeploy.databases.list()
-        storages = justdeploy.storages.list()
-        if not databases or not storages:
-            raise RuntimeError("The Playground organization needs at least one database and one storage.")
-
-        database_id = databases[0]["id"]
-        storage_id = storages[0]["id"]
         payload = b"JustDeploy SDK streaming check"
 
         try:
-            justdeploy.databases.create_table(
-                database_id,
-                {
-                    "name": table_name,
-                    "columns": [
-                        {"name": "label", "type": "string", "nullable": False},
-                        {"name": "value", "type": "integer", "nullable": False},
-                    ],
-                },
-            )
-            table_created = True
             inserted = justdeploy.databases.query(
                 database_id,
-                f"INSERT INTO `{table_name}` (`label`, `value`) VALUES (?, ?)",
+                "INSERT INTO `sdk_checks` (`label`, `value`) VALUES (?, ?)",
                 params=["before", 1],
             )
-            row_id = inserted["id"]
+            inserted_id = inserted.get("id")
+            if not isinstance(inserted_id, int) or isinstance(inserted_id, bool):
+                raise RuntimeError("The insert did not return a row ID.")
+            row_id = inserted_id
             selected = justdeploy.databases.query(
                 database_id,
-                f"SELECT `label`, `value` FROM `{table_name}` WHERE `id` = ?",
+                "SELECT `label`, `value` FROM `sdk_checks` WHERE `id` = ?",
                 params=[row_id],
             )
-            if selected["rows"] != [{"label": "before", "value": 1}]:
+            if selected.get("rows") != [{"label": "before", "value": 1}]:
                 raise RuntimeError("Unexpected inserted row.")
 
             justdeploy.databases.query(
                 database_id,
-                f"UPDATE `{table_name}` SET `label` = ?, `value` = ? WHERE `id` = ?",
+                "UPDATE `sdk_checks` SET `label` = ?, `value` = ? WHERE `id` = ?",
                 params=["after", 2, row_id],
             )
             updated = justdeploy.databases.query(
                 database_id,
-                f"SELECT `label`, `value` FROM `{table_name}` WHERE `id` = ?",
+                "SELECT `label`, `value` FROM `sdk_checks` WHERE `id` = ?",
                 params=[row_id],
             )
-            if updated["rows"] != [{"label": "after", "value": 2}]:
+            if updated.get("rows") != [{"label": "after", "value": 2}]:
                 raise RuntimeError("Unexpected updated row.")
 
-            justdeploy.databases.query(database_id, f"DELETE FROM `{table_name}` WHERE `id` = ?", params=[row_id])
+            justdeploy.databases.query(database_id, "DELETE FROM `sdk_checks` WHERE `id` = ?", params=[row_id])
             deleted = justdeploy.databases.query(
                 database_id,
-                f"SELECT `id` FROM `{table_name}` WHERE `id` = ?",
+                "SELECT `id` FROM `sdk_checks` WHERE `id` = ?",
                 params=[row_id],
             )
-            if deleted["rows"]:
+            if deleted.get("rows") != []:
                 raise RuntimeError("The database row was not deleted.")
+            row_id = None
 
             stored = justdeploy.storages.upload(
                 storage_id,
@@ -86,7 +79,6 @@ def handler(_event: object, _context: object) -> dict[str, object]:
             if downloaded != payload:
                 raise RuntimeError("The downloaded storage content did not match the upload.")
 
-            sender = os.environ["SDK_TEST_FROM"]
             idempotency_key = f"python-sdk-check-{uuid.uuid4()}"
             mail_input = {
                 "sender": sender,
@@ -114,5 +106,5 @@ def handler(_event: object, _context: object) -> dict[str, object]:
                 if file_id is not None:
                     justdeploy.storages.delete_file(storage_id, file_id)
             finally:
-                if table_created:
-                    justdeploy.databases.delete_table(database_id, table_name)
+                if row_id is not None:
+                    justdeploy.databases.query(database_id, "DELETE FROM `sdk_checks` WHERE `id` = ?", params=[row_id])

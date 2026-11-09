@@ -9,6 +9,9 @@ This repository contains the public Node.js and Python SDKs for JustDeploy.
 - The SDK covers Database, Storage and Mail. Do not add a generic raw-request API.
 - Do not add a JustDeploy CLI.
 - Keep public APIs small and explicit so an AI can select the correct operation without guessing.
+- Setup and management use the user's connected Plugin (MCP); app data uses the SDK. Never restore credential-bearing guide-copy setup.
+- Development permits six direct application operations; list/schema methods return 403. Keep existing Production methods compatible and document the stage boundary.
+- Playground validation fixtures use MCP-prepared resources and project environment IDs; never discover resources or mutate schema through SDK startup code.
 
 ## Security boundaries
 

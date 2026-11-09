@@ -27,6 +27,42 @@ python -m pip install justdeploy-sdk==0.2.2
 
 Publishing the SDK does not update dependencies inside existing deployed apps. Existing SDK calls remain supported. To use the new version, update your app's dependency declaration and any lockfile to `0.2.2`, then deploy that source. Keep working authentication unchanged.
 
+## Use your connected AI for setup
+
+Connect your desktop AI from **AI Plugin** in [Console](https://console.justdeploy.ai/console/mcp).
+Choose Codex or Claude, follow the desktop app’s connection steps, and sign in to
+JustDeploy to approve access. Then ask your AI to prepare the database, file storage,
+or email your app needs. [Plugin setup and recovery](https://www.justdeploy.ai/docs/mcp)
+contains the current steps; no deployment guide or personal token needs to be copied.
+
+The Plugin lets your AI manage JustDeploy. This SDK lets your **application** work with
+its data. Give your app the resource IDs your AI selected through server environment
+variables, and keep the file and mail IDs returned by its requests. Never put your
+personal Plugin token or OAuth session in the app.
+
+## Application API scope
+
+Use these six application operations for new integrations in both environments:
+
+| Operation | Node.js | Python |
+| --- | --- | --- |
+| Query or change database rows | `databases.query` | `databases.query` |
+| Prepare a file upload | `storages.createUploadUrl`, or `upload` for server bytes | `storages.create_upload_url`, or `upload` for server bytes |
+| Read or download a file | `storages.getFile`, `download` | `storages.get_file`, `download` |
+| Delete a file | `storages.deleteFile` | `storages.delete_file` |
+| Send an email | `mail.send` | `mail.send` |
+| Read one email’s status | `mail.get` | `mail.get` |
+
+Authentication exchanges and the signed file transfer are separate from these six
+resource operations. In **Development**, SDK resource-list methods and table-management
+methods return `403`; use MCP to find resource IDs and manage the schema. In
+**Production**, existing list and table methods remain supported for compatibility.
+The SDK does not bypass server permissions. Both environments use the same `0.2.2`
+package; this change does not require upgrading an existing working app.
+
+See [application API documentation](https://www.justdeploy.ai/docs/api) for the current
+HTTP contract and [MCP reference](https://www.justdeploy.ai/docs/mcp) for AI management.
+
 ## Quick start
 
 For local development, use a Credential from the [Production Console](https://console.justdeploy.ai) and resource IDs from that same organization:
@@ -76,7 +112,7 @@ The identity file's `apiBaseUrl` selects the deployment's API origin even when C
 
 A deployed application may keep explicit Credential environment variables; the SDK will continue to use them. JustDeploy CI/CD does not remove them or block the build. When it confirms that an application uses this SDK and directly supplies a Credential, build feedback recommends the simpler automatic deployment identity without exposing the Credential value.
 
-In Production and the Development Playground, sessions can access every External API in their own organization, including Credential creation. The SDK's three resource groups do not narrow server permissions, and resources are not bound to an individual project. Other Development organizations are not enabled for SDK authentication.
+Credentials and deployment identities are organization-scoped rather than isolated to one project. In Production, the existing organization API permissions remain; in Development, the six application operations above are the direct-call boundary. Other Development organizations outside Playground are not enabled for SDK authentication. Authentication alone does not grant MCP-only management access.
 
 ## Request behavior
 
@@ -113,9 +149,9 @@ Python:
 ```bash
 cd python
 uv sync --all-groups --frozen
-uv run ruff format --check . ../examples/python
-uv run ruff check . ../examples/python
-uv run mypy src tests ../examples/python
+uv run ruff format --check . ../examples/python ../examples/playground/python-cron
+uv run ruff check . ../examples/python ../examples/playground/python-cron
+uv run mypy src tests ../examples/python ../examples/playground/python-cron
 uv run pytest
 uv run pip-audit
 uv build

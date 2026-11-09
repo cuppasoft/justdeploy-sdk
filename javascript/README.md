@@ -4,6 +4,18 @@ The official JustDeploy SDK for server-side Node.js 22, 24 and 26. The package i
 
 Production supports local Credential authentication and automatic identity in deployed web, API, and cron applications. Development SDK access remains limited to Playground.
 
+## Setup through your AI
+
+Use **AI Plugin** in [Console](https://console.justdeploy.ai/console/mcp) to connect
+your desktop AI, then ask it to prepare your app’s resources and table structure.
+The SDK runs in your app; the Plugin runs in your AI. Never reuse personal Plugin
+credentials in application code. See the [shared setup and API boundary](../README.md#application-api-scope)
+and the [application API reference](https://www.justdeploy.ai/docs/api).
+
+In Development, resource lists and table-management methods return `403`. Production
+retains those existing methods. The runtime examples below use IDs supplied through
+server environment variables and tables already prepared through MCP.
+
 ## Install
 
 ```bash
@@ -33,22 +45,12 @@ For local development, set both `JUSTDEPLOY_ACCESS_KEY` and `JUSTDEPLOY_SECRET_K
 ## Database
 
 ```ts
-const databases = await justdeploy.databases.list();
 const result = await justdeploy.databases.query(databaseId,
   'SELECT * FROM orders WHERE customer = ?', { params: [customer] });
-
-const tables = await justdeploy.databases.listTables(databaseId);
-const table = await justdeploy.databases.createTable(databaseId, {
-  name: 'orders',
-  columns: [{ name: 'customer', type: 'string', nullable: false }],
-});
-await justdeploy.databases.updateTable(databaseId, 'orders', {
-  add: [{ name: 'paid', type: 'boolean', default: false }],
-});
-await justdeploy.databases.deleteTable(databaseId, 'orders');
 ```
 
-`query` accepts only the data statements allowed by the JustDeploy API. Use the table methods for schema changes.
+`query` accepts only the data statements allowed by the JustDeploy API. Ask your
+connected AI to change the schema through MCP; do not create tables on app startup.
 
 Prepare schema once before starting the application. A read returns `{ rows }`; a write returns `{ id }`, not `affectedRows`. Separate calls do not share a transaction.
 
@@ -89,15 +91,12 @@ Every call prepares a **new file** and is never automatically retried. A lost re
 ### Server files: upload bytes or a stream
 
 ```ts
-const storages = await justdeploy.storages.list();
-
 const file = await justdeploy.storages.upload(storageId, {
   name: 'hello.txt',
   mime: 'text/plain',
   data: new TextEncoder().encode('hello'),
 });
 
-const page = await justdeploy.storages.listFiles(storageId, { limit: 50 });
 const info = await justdeploy.storages.getFile(storageId, file.id);
 
 const download = await justdeploy.storages.download(storageId, file.id);
@@ -114,7 +113,8 @@ If a download races with a still-finishing upload, retry after the SDK's clear p
 
 Upload results have no signed URL. `file.size` is the number of bytes successfully transferred. After PUT succeeds, the file can be read without waiting for `active`; metadata may still be `pending`. Before PUT succeeds, `pending` alone does not prove bytes exist. Use `getFile` again only when final metadata is needed. Save the file ID, not the expiring URL. When redirecting a browser, use `(await justdeploy.storages.getFile(storageId, fileId)).url` without buffering the download.
 
-For pagination, pass `page.nextCursor` as the next call's `cursor` until it is null.
+Use the file ID returned by upload for later reads and deletion; do not list files
+to rediscover it.
 
 Transfer failures are safe SDK errors, not unchanged exceptions from your byte source. Failed uploads try to remove the pending record; cleanup failure does not replace the transfer error or cancellation.
 
@@ -131,11 +131,33 @@ const mail = await justdeploy.mail.send({
   idempotencyKey: 'welcome-user-123',
 });
 
-const page = await justdeploy.mail.list({ limit: 50 });
 const current = await justdeploy.mail.get(mail.id);
 ```
 
 Use one `idempotencyKey` per operation. A retry keeps its key and content; each new password reset needs a new key. The same key with different content is rejected with 409. SDK input uses `sender`; REST input and returned records use `from`. `delivered` means the receiving server accepted the message, not inbox placement. See the shared [Mail and tracking rules](../README.md#request-behavior).
+
+## Existing Production management methods
+
+These methods remain available in the published SDK for existing Production apps.
+They return `403` in Development. Use MCP for new resource-discovery and schema workflows.
+
+```ts
+const databases = await justdeploy.databases.list();
+const tables = await justdeploy.databases.listTables(databaseId);
+const table = await justdeploy.databases.createTable(databaseId, {
+  name: 'orders',
+  columns: [{ name: 'customer', type: 'string', nullable: false }],
+});
+await justdeploy.databases.updateTable(databaseId, 'orders', {
+  add: [{ name: 'paid', type: 'boolean', default: false }],
+});
+await justdeploy.databases.deleteTable(databaseId, 'orders');
+const storages = await justdeploy.storages.list();
+const files = await justdeploy.storages.listFiles(storageId, { limit: 50 });
+const mails = await justdeploy.mail.list({ limit: 50 });
+```
+
+For lists that support pagination, pass `nextCursor` as `cursor` until it is null.
 
 ## Errors and cancellation
 
