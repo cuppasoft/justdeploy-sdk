@@ -12,8 +12,8 @@ The SDK runs in your app; the Plugin runs in your AI. Never reuse personal Plugi
 credentials in application code. See the [shared setup and API boundary](../README.md#application-api-scope)
 and the [application API reference](https://www.justdeploy.ai/docs/api).
 
-In Development, resource lists and table-management methods return `403`. Production
-retains those existing methods. The runtime examples below use IDs supplied through
+In Development and Production, resource lists and table-management methods return
+`403`; use your connected AI through MCP for those operations. The runtime examples below use IDs supplied through
 server environment variables and tables already prepared through MCP.
 
 ## Install

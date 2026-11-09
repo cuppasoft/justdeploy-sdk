@@ -54,9 +54,9 @@ Use these six application operations for new integrations in both environments:
 | Read one email’s status | `mail.get` | `mail.get` |
 
 Authentication exchanges and the signed file transfer are separate from these six
-resource operations. In **Development**, SDK resource-list methods and table-management
-methods return `403`; use MCP to find resource IDs and manage the schema. In
-**Production**, existing list and table methods remain supported for compatibility.
+resource operations. In **Development and Production**, SDK resource-list and
+table-management methods return `403`; use MCP to find resource IDs and manage
+the schema.
 The SDK does not bypass server permissions. Both environments use the same `0.2.2`
 package; this change does not require upgrading an existing working app.
 
@@ -112,7 +112,7 @@ The identity file's `apiBaseUrl` selects the deployment's API origin even when C
 
 A deployed application may keep explicit Credential environment variables; the SDK will continue to use them. JustDeploy CI/CD does not remove them or block the build. When it confirms that an application uses this SDK and directly supplies a Credential, build feedback recommends the simpler automatic deployment identity without exposing the Credential value.
 
-Credentials and deployment identities are organization-scoped rather than isolated to one project. In Production, the existing organization API permissions remain; in Development, the six application operations above are the direct-call boundary. Other Development organizations outside Playground are not enabled for SDK authentication. Authentication alone does not grant MCP-only management access.
+Credentials and deployment identities are organization-scoped rather than isolated to one project. The six application operations above are the direct-call boundary in Production and Development. Other Development organizations outside Playground are not enabled for SDK authentication. Authentication alone does not grant MCP-only management access.
 
 ## Request behavior
 
