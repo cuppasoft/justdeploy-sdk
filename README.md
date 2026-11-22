@@ -40,9 +40,9 @@ its data. Give your app the resource IDs your AI selected through server environ
 variables, and keep the file and mail IDs returned by its requests. Never put your
 personal Plugin token or OAuth session in the app.
 
-## Application API scope
+## External API scope
 
-Use these six application operations for new integrations in both environments:
+The External API is the public REST API that the SDK calls from your app. It provides the six operations below in Development and Production. Your connected AI uses MCP for setup and resource management.
 
 | Operation | Node.js | Python |
 | --- | --- | --- |
@@ -60,7 +60,7 @@ the schema.
 The SDK does not bypass server permissions. Both environments use the same `0.2.2`
 package; this change does not require upgrading an existing working app.
 
-See [application API documentation](https://www.justdeploy.ai/docs/api) for the current
+See [External API documentation](https://www.justdeploy.ai/docs/api) for the current
 HTTP contract and [MCP reference](https://www.justdeploy.ai/docs/mcp) for AI management.
 
 ## Quick start
