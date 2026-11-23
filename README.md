@@ -2,7 +2,7 @@
 
 Official server-side SDKs for [JustDeploy](https://www.justdeploy.ai).
 
-> Version `0.2.2` is available on [npm](https://www.npmjs.com/package/@justdeploy/sdk/v/0.2.2) and [PyPI](https://pypi.org/project/justdeploy-sdk/0.2.2/).
+> Version `0.2.3` is available on [npm](https://www.npmjs.com/package/@justdeploy/sdk/v/0.2.3) and [PyPI](https://pypi.org/project/justdeploy-sdk/0.2.3/).
 >
 > The current release is supported in Production, including bound query values and browser-direct upload preparation. Local applications use Credential environment variables; deployed web, API, and cron applications can use automatic identity. Development remains limited to Playground.
 
@@ -18,14 +18,14 @@ Both packages cover Database, Storage, and Mail. They are for server application
 ## Install
 
 ```bash
-npm install @justdeploy/sdk@0.2.2
+npm install @justdeploy/sdk@0.2.3
 ```
 
 ```bash
-python -m pip install justdeploy-sdk==0.2.2
+python -m pip install justdeploy-sdk==0.2.3
 ```
 
-Publishing the SDK does not update dependencies inside existing deployed apps. Existing SDK calls remain supported. To use the new version, update your app's dependency declaration and any lockfile to `0.2.2`, then deploy that source. Keep working authentication unchanged.
+To upgrade an existing app, update its dependency declaration and any lockfile to `0.2.3`, then deploy that source. The server continues to support previous SDK versions.
 
 ## Use your connected AI for setup
 
@@ -57,8 +57,7 @@ Authentication exchanges and the signed file transfer are separate from these si
 resource operations. In **Development and Production**, SDK resource-list and
 table-management methods return `403`; use MCP to find resource IDs and manage
 the schema.
-The SDK does not bypass server permissions. Both environments use the same `0.2.2`
-package; this change does not require upgrading an existing working app.
+Both environments use the same SDK package. The API checks permissions for each request.
 
 See [External API documentation](https://www.justdeploy.ai/docs/api) for the current
 HTTP contract and [MCP reference](https://www.justdeploy.ai/docs/mcp) for AI management.
@@ -73,9 +72,9 @@ export JUSTDEPLOY_SECRET_KEY="<secret-key>"
 export JUSTDEPLOY_ORGANIZATION_ID="<organization-uid>"
 ```
 
-Use the UID of the organization that owns the Credential. Keep the Access Key and Secret Key out of source code and deployment bundles. The SDK itself does not read `.env` files.
+Set `JUSTDEPLOY_ORGANIZATION_ID` to the UID of the organization that owns the Credential to route token requests to its region. Keep the Access Key and Secret Key out of source code and deployment bundles. The SDK itself does not read `.env` files.
 
-In a deployed JustDeploy application, use the same argument-free client without setting either variable. The SDK uses the deployment identity that JustDeploy places in the image. This works in Production and the Development Playground. A local client always uses Production; Development Credentials cannot authenticate there.
+In a deployed JustDeploy application, use the same argument-free client to authenticate with the deployment identity that JustDeploy places in the image. This works in Production and the Development Playground. A local client always uses Production; Development Credentials cannot authenticate there.
 
 ```ts
 import { JustDeploy } from '@justdeploy/sdk';

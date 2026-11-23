@@ -80,7 +80,7 @@ def fixture(monkeypatch: pytest.MonkeyPatch, *, fail_at: str | None = None) -> t
 
 def test_playground_uses_prepared_resources_and_only_its_own_data(monkeypatch: pytest.MonkeyPatch) -> None:
     run, calls = fixture(monkeypatch)
-    assert run(None, None) == {"sdk": "python/0.2.2", "databaseDml": True, "storageStreaming": True, "mailIdempotency": True}
+    assert run(None, None) == {"sdk": "python/0.2.3", "databaseDml": True, "storageStreaming": True, "mailIdempotency": True}
     assert calls.count("DELETE") == 1
     assert calls[-1] == "delete_file"
     mails = [call for call in calls if isinstance(call, dict)]

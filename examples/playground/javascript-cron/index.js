@@ -85,7 +85,7 @@ exports.handler = async () => {
     }
 
     const result = {
-      sdk: 'javascript/0.2.2',
+      sdk: 'javascript/0.2.3',
       databaseDml: true,
       storageStreaming: true,
       mailIdempotency: true,

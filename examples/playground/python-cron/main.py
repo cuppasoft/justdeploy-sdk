@@ -94,7 +94,7 @@ def handler(_event: object, _context: object) -> dict[str, object]:
                 raise RuntimeError("The same mail idempotency key created two messages.")
 
             result = {
-                "sdk": "python/0.2.2",
+                "sdk": "python/0.2.3",
                 "databaseDml": True,
                 "storageStreaming": True,
                 "mailIdempotency": True,
