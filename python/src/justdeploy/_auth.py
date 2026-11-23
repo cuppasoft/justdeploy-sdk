@@ -146,7 +146,9 @@ def _parse_identity(path: Path, *, require_build_key: bool) -> IdentityDocument 
     organization_id = value.get("organizationId")
     if "organizationId" in value and (not isinstance(organization_id, str) or PLATFORM_ID.fullmatch(organization_id) is None):
         raise JustDeployConfigurationError("The JustDeploy organization ID in the deployment identity is invalid.")
-    return IdentityDocument(protocol_version, str(build_id), str(private_key), _validate_api_origin(value.get("apiBaseUrl")), organization_id)
+    return IdentityDocument(
+        protocol_version, str(build_id), str(private_key), _validate_api_origin(value.get("apiBaseUrl")), organization_id
+    )
 
 
 def _resolve_authentication(env: Mapping[str, str], identity_path: Path) -> ResolvedAuthentication:

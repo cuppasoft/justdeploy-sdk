@@ -9,7 +9,7 @@ Production supports local Credential authentication and automatic identity in de
 Use **AI Plugin** in [Console](https://console.justdeploy.ai/console/mcp) to connect
 your desktop AI, then ask it to prepare your app’s resources and table structure.
 The SDK runs in your app; the Plugin runs in your AI. Never reuse personal Plugin
-credentials in application code. See the [shared setup and API boundary](../README.md#application-api-scope)
+credentials in application code. See the [shared setup and API boundary](../README.md#external-api-scope)
 and the [application API reference](https://www.justdeploy.ai/docs/api).
 
 In Development and Production, resource lists and table-management methods return
@@ -19,7 +19,7 @@ server environment variables and tables already prepared through MCP.
 ## Install
 
 ```bash
-npm install @justdeploy/sdk@0.2.2
+npm install @justdeploy/sdk@0.2.3
 ```
 
 ## Client
@@ -41,6 +41,8 @@ const justdeploy = new JustDeploy();
 ```
 
 For local development, set both `JUSTDEPLOY_ACCESS_KEY` and `JUSTDEPLOY_SECRET_KEY` in the process environment, using a Production Credential and resource IDs from the same organization. Deployed JustDeploy applications need no SDK configuration. A local client cannot use Development Credentials; test a Development organization in its deployed Playground app. If a deployed application explicitly keeps both variables, the SDK accepts and prioritizes them; build feedback recommends the simpler automatic deployment identity without blocking the build.
+
+With a manually configured Credential, set `JUSTDEPLOY_ORGANIZATION_ID` to the owning organization's UID to route token requests to its region. For automatic authentication, the SDK uses the organization UID from the deployment identity when present. Requests without a UID use the compatibility route.
 
 ## Database
 
