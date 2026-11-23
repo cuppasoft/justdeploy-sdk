@@ -318,6 +318,7 @@ def test_build_identity_signs_exact_request_and_uses_its_origin(tmp_path: Path) 
             {
                 "protocolVersion": 1,
                 "buildId": build_id,
+                "organizationId": ORG,
                 "privateKey": base64.b64encode(encoded_key).decode(),
                 "apiBaseUrl": origin,
             }
@@ -333,6 +334,7 @@ def test_build_identity_signs_exact_request_and_uses_its_origin(tmp_path: Path) 
         signature = base64.urlsafe_b64decode(request.headers["x-justdeploy-build-signature"] + "==")
         private_key.public_key().verify(signature, signing_input)
         assert "authorization" not in request.headers
+        assert request.headers["x-justdeploy-organization"] == ORG
         return session("build-token")
 
     client = httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=False)
@@ -343,6 +345,23 @@ def test_build_identity_signs_exact_request_and_uses_its_origin(tmp_path: Path) 
     assert result.token == "build-token"
 
 
+def test_credential_organization_header_must_match_the_session() -> None:
+    organization_id = ORG
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/auth/credential"
+        assert request.headers["x-justdeploy-organization"] == ORG
+        assert json.loads(request.content) == {}
+        return response({"token": "session-token", "organizationId": organization_id, "expiresAt": EXPIRY})
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        env = {**ENV, "JUSTDEPLOY_ORGANIZATION_ID": ORG}
+        assert SyncAuthManager(client, env=env, identity_path=Path("/does/not/exist")).get_session().organization_id == ORG
+        organization_id = "zzzzzzzzzzzzzzzz"
+        with pytest.raises(JustDeployAuthenticationError):
+            SyncAuthManager(client, env=env, identity_path=Path("/does/not/exist")).get_session()
+
+
 def test_deployed_credentials_use_identity_origin_and_unsafe_identity_files_fail(tmp_path: Path) -> None:
     origin = "https://api-dev.justdeploy.net"
     identity_path = tmp_path / "identity.json"
@@ -351,6 +370,7 @@ def test_deployed_credentials_use_identity_origin_and_unsafe_identity_files_fail
 
     def handler(request: httpx.Request) -> httpx.Response:
         assert str(request.url) == f"{origin}/auth/credential"
+        assert "x-justdeploy-organization" not in request.headers
         return session()
 
     client = httpx.Client(transport=httpx.MockTransport(handler))

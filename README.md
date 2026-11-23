@@ -70,9 +70,10 @@ For local development, use a Credential from the [Production Console](https://co
 ```bash
 export JUSTDEPLOY_ACCESS_KEY="<access-key>"
 export JUSTDEPLOY_SECRET_KEY="<secret-key>"
+export JUSTDEPLOY_ORGANIZATION_ID="<organization-uid>"
 ```
 
-Do not put those values in source code or include a local `.env` file in a deployment. The SDK itself does not read `.env` files.
+Use the UID of the organization that owns the Credential. Keep the Access Key and Secret Key out of source code and deployment bundles. The SDK itself does not read `.env` files.
 
 In a deployed JustDeploy application, use the same argument-free client without setting either variable. The SDK uses the deployment identity that JustDeploy places in the image. This works in Production and the Development Playground. A local client always uses Production; Development Credentials cannot authenticate there.
 
@@ -109,6 +110,8 @@ The client has no configuration arguments and follows one fixed order:
 One missing or empty Credential variable is an error. A rejected Credential never falls back to the deployment identity. The identity path signs `POST /auth/build` to obtain the same 10-minute session; it does not use AWS STS or cloud-specific credentials. Sessions stay in memory. A request made within three minutes of expiry refreshes the session, and concurrent requests on the same client share that exchange. There is no background refresh loop.
 
 The identity file's `apiBaseUrl` selects the deployment's API origin even when Credential environment variables take priority. Without an identity file, the client always uses `https://api.justdeploy.net`. There is no API URL override or constructor Credential argument, and the SDK does not load `.env` files.
+
+For automatic authentication, the SDK sends the organization UID from the deployment identity in `X-JustDeploy-Organization`. For manual authentication, it sends the UID from `JUSTDEPLOY_ORGANIZATION_ID` when provided. This lets the API issue the session in the organization's region. Existing deployment identities and manual setups without an organization UID use the compatibility path.
 
 A deployed application may keep explicit Credential environment variables; the SDK will continue to use them. JustDeploy CI/CD does not remove them or block the build. When it confirms that an application uses this SDK and directly supplies a Credential, build feedback recommends the simpler automatic deployment identity without exposing the Credential value.
 

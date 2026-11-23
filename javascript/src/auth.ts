@@ -17,6 +17,7 @@ const CANONICAL_BASE64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9
 interface IdentityDocument {
   protocolVersion: number;
   buildId: string;
+  organizationId: string | undefined;
   privateKey: string;
   apiBaseUrl: string;
 }
@@ -37,7 +38,7 @@ export interface AuthManagerOptions {
 
 interface ResolvedAuthentication {
   apiOrigin: string;
-  credentials: { accessKey: string; secretKey: string } | null;
+  credentials: { accessKey: string; secretKey: string; organizationId: string | undefined } | null;
   identity: IdentityDocument | null;
 }
 
@@ -119,6 +120,10 @@ function parseIdentity(path: string, requireBuildKey: boolean): IdentityDocument
   if (document.protocolVersion !== 1) {
     throw new JustDeployConfigurationError('The JustDeploy deployment identity protocol is not supported by this SDK.');
   }
+  const organizationId = document.organizationId;
+  if (organizationId !== undefined && (typeof organizationId !== 'string' || organizationId.length !== 16 || !PLATFORM_ID.test(organizationId))) {
+    throw new JustDeployConfigurationError('The JustDeploy organization ID in the deployment identity is invalid.');
+  }
 
   if (requireBuildKey && (!document.buildId || !BUILD_UUID.test(document.buildId) || typeof document.privateKey !== 'string' || document.privateKey.length === 0)) {
     throw new JustDeployConfigurationError('The JustDeploy deployment identity is missing a valid build key.');
@@ -127,6 +132,7 @@ function parseIdentity(path: string, requireBuildKey: boolean): IdentityDocument
   return {
     protocolVersion: 1,
     buildId: document.buildId ?? '',
+    organizationId,
     privateKey: document.privateKey ?? '',
     apiBaseUrl,
   };
@@ -201,7 +207,11 @@ export class AuthManager {
     const identity = parseIdentity(this.identityPath, !hasAccess);
     const apiOrigin = identity?.apiBaseUrl ?? DEFAULT_API_ORIGIN;
     if (hasAccess && hasSecret) {
-      this.credentialAuthentication ??= { apiOrigin, credentials: { accessKey: access, secretKey: secret }, identity: null };
+      const organizationId = this.env.JUSTDEPLOY_ORGANIZATION_ID;
+      if (organizationId !== undefined && (organizationId.length !== 16 || !PLATFORM_ID.test(organizationId))) {
+        throw new JustDeployConfigurationError('Set JUSTDEPLOY_ORGANIZATION_ID to a valid organization UID.');
+      }
+      this.credentialAuthentication ??= { apiOrigin, credentials: { accessKey: access, secretKey: secret, organizationId }, identity: null };
       return this.credentialAuthentication;
     }
     if (!identity) {
@@ -218,7 +228,7 @@ export class AuthManager {
     return this.exchangeBuild(resolved.apiOrigin, resolved.identity!);
   }
 
-  private async exchangeCredential(apiOrigin: string, credentials: { accessKey: string; secretKey: string }): Promise<AuthSession> {
+  private async exchangeCredential(apiOrigin: string, credentials: NonNullable<ResolvedAuthentication['credentials']>): Promise<AuthSession> {
     return this.requestSession(
       apiOrigin,
       `${apiOrigin}/auth/credential`,
@@ -229,6 +239,7 @@ export class AuthManager {
         'x-justdeploy-sdk': SDK_HEADER,
       },
       '{}',
+      credentials.organizationId,
     );
   }
 
@@ -260,16 +271,17 @@ export class AuthManager {
         'x-justdeploy-sdk': SDK_HEADER,
       },
       JSON.stringify({ buildId: identity.buildId, issuedAt }),
+      identity.organizationId,
     );
   }
 
-  private async requestSession(apiOrigin: string, url: string, headers: Record<string, string>, body: string): Promise<AuthSession> {
+  private async requestSession(apiOrigin: string, url: string, headers: Record<string, string>, body: string, organizationId?: string): Promise<AuthSession> {
     const timeout = AbortSignal.timeout(AUTH_TIMEOUT_MS);
     let response: Response;
     try {
       response = await this.fetcher(url, {
         method: 'POST',
-        headers,
+        headers: organizationId ? { ...headers, 'x-justdeploy-organization': organizationId } : headers,
         body,
         redirect: 'error',
         signal: timeout,
@@ -294,6 +306,7 @@ export class AuthManager {
       payload.token.length === 0 ||
       typeof payload.organizationId !== 'string' ||
       !PLATFORM_ID.test(payload.organizationId) ||
+      (organizationId !== undefined && payload.organizationId !== organizationId) ||
       !Number.isFinite(expiresAt) ||
       expiresAt <= this.now()
     ) {

@@ -236,10 +236,29 @@ test('credential exchange has priority and supplies the API session header', asy
   assert.equal(calls.length, 2);
   assert.equal(calls[0].url, `${API}/auth/credential`);
   assert.equal(header(calls[0].init, 'authorization'), 'Bearer ak_test:sk_test');
+  assert.equal(header(calls[0].init, 'x-justdeploy-organization'), null);
   assert.equal(calls[0].init.body, '{}');
   assert.equal(calls[1].url, `${API}/organizations/${ORG}/databases`);
   assert.equal(header(calls[1].init, 'authorization'), 'Bearer session-token');
   assert.equal(header(calls[1].init, 'x-justdeploy-sdk'), `javascript/${SDK_VERSION}`);
+});
+
+test('configured Credential organization is sent only in the authentication header and must match the session', async () => {
+  let organizationId = ORG;
+  const fetcher = async (input, init) => {
+    assert.equal(String(input), `${API}/auth/credential`);
+    assert.equal(header(init, 'x-justdeploy-organization'), ORG);
+    assert.equal(init.body, '{}');
+    return json({ token: 'session-token', organizationId, expiresAt: EXPIRY });
+  };
+  const options = {
+    env: { JUSTDEPLOY_ACCESS_KEY: 'ak_test', JUSTDEPLOY_SECRET_KEY: 'sk_test', JUSTDEPLOY_ORGANIZATION_ID: ORG },
+    identityPath: '/does/not/exist',
+    fetcher,
+  };
+  assert.equal((await new AuthManager(options).getSession()).organizationId, ORG);
+  organizationId = 'zzzzzzzzzzzzzzzz';
+  await assert.rejects(new AuthManager(options).getSession(), JustDeployAuthenticationError);
 });
 
 test('partial or empty local credentials fail and never fall back to identity', async () => {
@@ -263,7 +282,7 @@ test('build identity signs the exact request and selects its API origin', async 
   const privateKeyDer = privateKey.export({ format: 'der', type: 'pkcs8' });
   writeFileSync(
     path,
-    JSON.stringify({ protocolVersion: 1, buildId, privateKey: privateKeyDer.toString('base64'), apiBaseUrl: origin }),
+    JSON.stringify({ protocolVersion: 1, buildId, organizationId: ORG, privateKey: privateKeyDer.toString('base64'), apiBaseUrl: origin }),
     { mode: 0o444 },
   );
   chmodSync(path, 0o444);
@@ -276,6 +295,7 @@ test('build identity signs the exact request and selects its API origin', async 
       const signingInput = `justdeploy-build-auth-v1\n${origin}\nPOST\n/auth/build\n${buildId}\n${issuedAt}`;
       assert.equal(verify(null, Buffer.from(signingInput), publicKey, Buffer.from(header(init, 'x-justdeploy-build-signature'), 'base64url')), true);
       assert.equal(header(init, 'authorization'), null);
+      assert.equal(header(init, 'x-justdeploy-organization'), ORG);
       return session('build-token');
     };
     const auth = new AuthManager({ env: {}, identityPath: path, fetcher, now: () => issuedAt * 1000 });

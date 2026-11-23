@@ -40,6 +40,7 @@ class IdentityDocument:
     build_id: str
     private_key: str
     api_origin: str
+    organization_id: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,6 +56,7 @@ class ResolvedAuthentication:
     api_origin: str
     credentials: tuple[str, str] | None
     identity: IdentityDocument | None
+    organization_id: str | None
 
 
 def _validate_api_origin(value: object) -> str:
@@ -141,7 +143,10 @@ def _parse_identity(path: Path, *, require_build_key: bool) -> IdentityDocument 
         not isinstance(build_id, str) or BUILD_UUID.fullmatch(build_id) is None or not isinstance(private_key, str) or not private_key
     ):
         raise JustDeployConfigurationError("The JustDeploy deployment identity is missing a valid build key.")
-    return IdentityDocument(protocol_version, str(build_id), str(private_key), _validate_api_origin(value.get("apiBaseUrl")))
+    organization_id = value.get("organizationId")
+    if "organizationId" in value and (not isinstance(organization_id, str) or PLATFORM_ID.fullmatch(organization_id) is None):
+        raise JustDeployConfigurationError("The JustDeploy organization ID in the deployment identity is invalid.")
+    return IdentityDocument(protocol_version, str(build_id), str(private_key), _validate_api_origin(value.get("apiBaseUrl")), organization_id)
 
 
 def _resolve_authentication(env: Mapping[str, str], identity_path: Path) -> ResolvedAuthentication:
@@ -156,17 +161,22 @@ def _resolve_authentication(env: Mapping[str, str], identity_path: Path) -> Reso
     api_origin = identity.api_origin if identity else DEFAULT_API_ORIGIN
     if has_access and has_secret:
         assert access is not None and secret is not None
-        return ResolvedAuthentication(api_origin, (access, secret), identity)
+        organization_id = env.get("JUSTDEPLOY_ORGANIZATION_ID")
+        if organization_id is not None and PLATFORM_ID.fullmatch(organization_id) is None:
+            raise JustDeployConfigurationError("Set JUSTDEPLOY_ORGANIZATION_ID to a valid organization UID.")
+        return ResolvedAuthentication(api_origin, (access, secret), None, organization_id)
     if identity is None:
         raise JustDeployAuthenticationError(
             "JustDeploy authentication is not configured. Set JUSTDEPLOY_ACCESS_KEY and JUSTDEPLOY_SECRET_KEY for local development; "
             "deployed JustDeploy applications receive an identity automatically."
         )
-    return ResolvedAuthentication(api_origin, None, identity)
+    return ResolvedAuthentication(api_origin, None, identity, identity.organization_id)
 
 
 def _build_request(resolved: ResolvedAuthentication, now: float) -> tuple[str, dict[str, str], dict[str, object]]:
     common_headers = {"accept": "application/json", "content-type": "application/json", "x-justdeploy-sdk": SDK_HEADER}
+    if resolved.organization_id is not None:
+        common_headers["x-justdeploy-organization"] = resolved.organization_id
     if resolved.credentials:
         access, secret = resolved.credentials
         return (
@@ -195,7 +205,7 @@ def _build_request(resolved: ResolvedAuthentication, now: float) -> tuple[str, d
     )
 
 
-def _session_from_response(response: httpx.Response, api_origin: str, now: float) -> AuthSession:
+def _session_from_response(response: httpx.Response, api_origin: str, now: float, expected_organization_id: str | None) -> AuthSession:
     if not response.is_success:
         message = "JustDeploy authentication was rejected."
         details: dict[str, Any] = {}
@@ -229,6 +239,7 @@ def _session_from_response(response: httpx.Response, api_origin: str, now: float
         or not token
         or not isinstance(organization_id, str)
         or PLATFORM_ID.fullmatch(organization_id) is None
+        or (expected_organization_id is not None and organization_id != expected_organization_id)
         or expires_at <= now
     ):
         raise JustDeployAuthenticationError(
@@ -285,14 +296,14 @@ class SyncAuthManager:
             raise JustDeployAuthenticationError("JustDeploy authentication timed out.") from None
         except httpx.HTTPError:
             raise JustDeployAuthenticationError("JustDeploy authentication failed before the server returned a response.") from None
-        return _session_from_response(response, resolved.api_origin, self._clock())
+        return _session_from_response(response, resolved.api_origin, self._clock(), resolved.organization_id)
 
     def _resolve(self) -> ResolvedAuthentication:
         if self._credential_authentication:
             return self._credential_authentication
         resolved = _resolve_authentication(self._env, self._identity_path)
         if resolved.credentials:
-            self._credential_authentication = ResolvedAuthentication(resolved.api_origin, resolved.credentials, None)
+            self._credential_authentication = resolved
             return self._credential_authentication
         return resolved
 
@@ -344,13 +355,13 @@ class AsyncAuthManager:
             raise JustDeployAuthenticationError("JustDeploy authentication timed out.") from None
         except httpx.HTTPError:
             raise JustDeployAuthenticationError("JustDeploy authentication failed before the server returned a response.") from None
-        return _session_from_response(response, resolved.api_origin, self._clock())
+        return _session_from_response(response, resolved.api_origin, self._clock(), resolved.organization_id)
 
     def _resolve(self) -> ResolvedAuthentication:
         if self._credential_authentication:
             return self._credential_authentication
         resolved = _resolve_authentication(self._env, self._identity_path)
         if resolved.credentials:
-            self._credential_authentication = ResolvedAuthentication(resolved.api_origin, resolved.credentials, None)
+            self._credential_authentication = resolved
             return self._credential_authentication
         return resolved
